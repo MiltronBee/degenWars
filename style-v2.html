@@ -339,6 +339,14 @@ h1,h2,h3,.disp{font-family:var(--f-disp);font-weight:400;letter-spacing:.01em;ma
 .proj{position:absolute;width:6px;height:6px;border-radius:50%;margin:-3px 0 0 -3px;background:currentColor;box-shadow:0 0 8px currentColor;z-index:99;pointer-events:none}
 .float{position:absolute;top:-10%;left:50%;transform:translateX(-50%);font-weight:700;font-size:15px;pointer-events:none;text-shadow:0 2px 0 #000,0 0 4px #000;animation:float .8s forwards;z-index:5;white-space:nowrap}
 @keyframes float{to{transform:translate(-50%,-30px);opacity:0}}
+/* enemy hit feedback: damage numbers, flung corpses, camera shake (world layers only; HUD and ribbons stay put) */
+#field>:is(.terrain,.paint,.gplane,.zone,.elabel,.fu,.proj,.dmg){translate:var(--shx,0) var(--shy,0)}
+.dmg{position:absolute;z-index:960;pointer-events:none;white-space:nowrap;font-family:var(--f-num);font-weight:700;line-height:1;color:#fff1cf;transform:translate(-50%,-50%);
+ text-shadow:0 2px 0 #1a0f08,2px 0 0 #1a0f08,-2px 0 0 #1a0f08,0 -2px 0 #1a0f08,1px 1px 0 #1a0f08,-1px -1px 0 #1a0f08,0 4px 8px rgba(0,0,0,.55);will-change:transform,opacity}
+.dmg.crit{color:#ffb347;text-shadow:0 2px 0 #3a1404,2px 0 0 #3a1404,-2px 0 0 #3a1404,0 -2px 0 #3a1404,1px 1px 0 #3a1404,-1px -1px 0 #3a1404,0 0 12px rgba(255,140,40,.75)}
+.fu.enemy.flung{opacity:1;transform:translate(-50%,-82%);transition:none;z-index:940!important}
+.fu.enemy.flung .hp{opacity:0}
+.fu.enemy.flung.gone{opacity:0}
 .info{margin-top:10px;background:linear-gradient(#2a2119,#1e1712);border:1px solid #4d3c29;border-radius:14px;padding:10px 12px;min-height:60px;font-size:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .info b{font-family:var(--f-num);font-weight:700;color:#e8d3a8}
 .info .mute{color:var(--mute)}
@@ -1589,6 +1597,7 @@ function play(el,clip,o={}){
  el._a={c,clip,t0:performance.now()-(o.off||0),loop:c.loop&&!o.once,then:o.then||null,hold:!!o.hold,i:-1};anims.add(el);return c.n/c.fps*1000;
 }
 function tick(now){
+ if(now<HS.until){requestAnimationFrame(tick);return} // hitstop: hold every sprite frame
  const k=F?speed:1;
  for(const el of anims){if(!el.isConnected){anims.delete(el);continue}const a=el._a,c=a.c,S=SHEETS[el.dataset.k];
   let i=Math.floor((now-a.t0)/1000*c.fps*k);
@@ -1734,6 +1743,44 @@ const bus={h:{},log:[],
  emit(e,d={}){this.log.push({e,d,t:Math.round(performance.now())});if(this.log.length>60)this.log.shift();
   (this.h[e]||[]).slice().forEach(f=>{try{f(d)}catch(err){console.warn(err)}});(this.h['*']||[]).slice().forEach(f=>{try{f(e,d)}catch(err){console.warn(err)}})}};
 window.degenCues=bus;
+// ---- sound: Web Audio one-shots driven by the cue bus. Each file is decoded once (low latency on phones).
+// The context starts suspended until the first touch/key (browser autoplay rule).
+// Files live in audio/<name>.mp3. Until a file exists, hit/crit/explode/coin play a synthesized stand-in; lever stays silent.
+const SFX={ctx:null,buf:{},nz:{},vol:.8,last:{},gap:{hit:45,crit:60,explode:50,coin:40}, // gap: min ms between two plays of one sound
+ trim:{hit:1.34,coin:1.47,win:1.19,roll:1.09}, // per-file lift to one loudness: printed by tools/prep-audio.py (re-run it after changing audio/src)
+ loops:{roll:[.5,4.6]}, // loop range in s inside the steady part, only reached by very long spins
+ init(){if(this.ctx)return this.ctx;const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return null;try{this.ctx=new AC()}catch(e){}return this.ctx},
+ async load(name,url){const c=this.init();if(!c)return;try{const r=await fetch(url);if(!r.ok)return;this.buf[name]=await c.decodeAudioData(await r.arrayBuffer())}catch(e){}},
+ // vary: every play nudges the pitch by up to ±vary (6% by default) so repeats never sound identical
+ play(name,{vol=1,rate=1,vary=.06,loop=false}={}){const c=this.ctx;if(!c)return null;const now=performance.now();if(now-(this.last[name]||0)<(this.gap[name]||0))return null;this.last[name]=now;
+  if(c.state==='suspended')c.resume();rate*=1+(Math.random()*2-1)*vary;
+  let b=this.buf[name];if(!b&&name==='crit'&&this.buf.hit){b=this.buf.hit;rate*=.8;vol*=1.2} // a crit without its own file: the hit, deeper and louder
+  if(!b)return loop?null:this.synth(name,vol,rate);
+  const s=c.createBufferSource(),g=c.createGain();s.buffer=b;s.loop=loop;if(loop&&this.loops[name]){[s.loopStart,s.loopEnd]=this.loops[name]}s.playbackRate.value=rate;g.gain.value=this.vol*(this.trim[name]||1)*vol;s.connect(g).connect(c.destination);s.start();
+  // stop(ms): fade out over ms, then stop (used to cut the reel roll when the last reel lands)
+  return {s,g,stop(ms=120){const t=c.currentTime;try{g.gain.cancelScheduledValues(t);g.gain.setValueAtTime(g.gain.value,t);g.gain.linearRampToValueAtTime(0,t+ms/1000);s.stop(t+ms/1000+.02)}catch(e){}}}},
+ synth(name,vol,rate){const c=this.ctx,t=c.currentTime,out=c.createGain();out.gain.value=this.vol*vol;out.connect(c.destination);
+  const env=(node,peak,dur,at=0)=>{const g=c.createGain();g.gain.setValueAtTime(peak,t+at);g.gain.exponentialRampToValueAtTime(.001,t+at+dur);node.connect(g).connect(out)};
+  const tone=(type,f0,f1,dur,peak,at=0)=>{const o=c.createOscillator();o.type=type;o.frequency.setValueAtTime(f0*rate,t+at);o.frequency.exponentialRampToValueAtTime(f1*rate,t+at+dur);env(o,peak,dur,at);o.start(t+at);o.stop(t+at+dur+.02)};
+  const hiss=(f,q,dur,peak,type='bandpass')=>{let nb=this.nz[dur];if(!nb){nb=this.nz[dur]=c.createBuffer(1,Math.ceil(c.sampleRate*dur),c.sampleRate);const d=nb.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1}
+   const s=c.createBufferSource(),bq=c.createBiquadFilter();s.buffer=nb;bq.type=type;bq.frequency.value=f*rate;bq.Q.value=q;s.connect(bq);env(bq,peak,dur);s.start(t)};
+  if(name==='hit'){hiss(2200,.9,.07,.55);tone('triangle',190,70,.09,.6)}
+  else if(name==='crit'){hiss(1200,.7,.16,.8);tone('square',150,45,.16,.35);tone('triangle',380,120,.1,.4)}
+  else if(name==='explode'){hiss(700,.5,.55,.9,'lowpass');tone('sine',110,32,.45,.9)}
+  else if(name==='coin'){tone('square',1320,1320,.05,.12);tone('square',1760,1760,.09,.12,.05)}
+  else{out.disconnect();return null}
+  return {out}}};
+window.degenSfx=SFX;
+['pointerdown','keydown'].forEach(ev=>addEventListener(ev,()=>{const c=SFX.init();if(c&&c.state==='suspended')c.resume()},{capture:true,passive:true}));
+['lever','roll','win','lose','hit','crit','explode','coin'].forEach(n=>SFX.load(n,`audio/${n}.mp3`));
+bus.on('lever_release',d=>SFX.play('lever',{vol:.75+.25*(d.power||0)})); // harder pull = louder slam
+// the reels roll from the pull until the last reel lands (tease and slam-stop included: both just move that last stop)
+let rollSnd=null;const stopRoll=(ms=140)=>{if(rollSnd){rollSnd.stop(ms);rollSnd=null}};
+bus.on('spin_start',()=>{stopRoll(40);rollSnd=SFX.play('roll',{vol:.55,loop:true})});
+bus.on('reel_stop',d=>{if(d.col===2)stopRoll()});
+// result: win on any paying action (spin, nudge or blast; bigger tiers louder), lose only on a spin that paid nothing
+bus.on('win_start',d=>{stopRoll(60);SFX.play('win',{vol:.7+.075*Math.min(4,d.tier||1)})});
+bus.on('dud',()=>{stopRoll(60);SFX.play('lose',{vol:.7})});bus.on('near_miss',()=>{stopRoll(60);SFX.play('lose',{vol:.7})});
 // ---- motion + haptics ----
 const RMq=matchMedia('(prefers-reduced-motion: reduce)'),RM=()=>RMq.matches;
 const canBuzz=typeof navigator.vibrate==='function';
@@ -1791,13 +1838,18 @@ const FX=(()=>{
   g.fillStyle='rgba(92,72,56,.9)';g.font=`bold ${s*.42}px serif`;g.textAlign='center';g.textBaseline='middle';g.fillText('★',r,r+1);
   for(let i=0;i<18;i++){g.fillStyle=`rgba(48,49,47,${Math.random()*.35})`;g.fillRect(Math.random()*s,Math.random()*s,2,2)}});
  const puff=(c0,c1,mid)=>spr(64,(g,s)=>{const gr=g.createRadialGradient(s/2,s/2,0,s/2,s/2,s/2);gr.addColorStop(0,c0);if(mid)gr.addColorStop(.6,mid);gr.addColorStop(1,c1);g.fillStyle=gr;g.fillRect(0,0,s,s)});
- const SMOKE=puff('rgba(48,49,47,.75)','rgba(48,49,47,0)','rgba(48,49,47,.3)'),DUST=puff('rgba(182,173,148,.6)','rgba(182,173,148,0)');
+ const SMOKE=puff('rgba(48,49,47,.75)','rgba(48,49,47,0)','rgba(48,49,47,.3)'),DUST=puff('rgba(182,173,148,.6)','rgba(182,173,148,0)'),GLOW=puff('rgba(255,250,235,1)','rgba(255,150,50,0)','rgba(255,205,120,.55)');
  const P=[];let raf=0,lastT=0;
- function add(p){if(RM())return;if(P.length>380)P.shift();P.push(Object.assign({age:0,rot:0,vr:0,g:0,drag:1},p));if(!raf){lastT=performance.now();raf=requestAnimationFrame(step)}}
+ function add(p){if(RM())return;if(P.length>380)P.shift();P.push(Object.assign({age:0,rot:0,vr:0,g:0,drag:1,vx:0,vy:0},p));if(!raf){lastT=performance.now();raf=requestAnimationFrame(step)}}
  function step(t){const dt=Math.min(.033,(t-lastT)/1000);lastT=t;ctx.setTransform(DPR,0,0,DPR,0,0);ctx.clearRect(0,0,VW,VH);
   for(let i=P.length-1;i>=0;i--){const p=P[i];p.age+=dt;if(p.age>=p.life||p.y>VH+60){P.splice(i,1);continue}
    p.vx*=p.drag;p.vy=p.vy*p.drag+p.g*dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.rot+=p.vr*dt;const k=p.age/p.life;
-   if(p.type==='token'){ctx.globalAlpha=k>.8?(1-k)*5:1;ctx.setTransform(DPR*Math.max(.08,Math.abs(Math.cos(p.rot))),0,0,DPR,p.x*DPR,p.y*DPR);ctx.drawImage(TOKEN,-p.s/2,-p.s/2,p.s,p.s);ctx.setTransform(DPR,0,0,DPR,0,0)}
+   // coin: bursts out like a token, then homes on its target (ease-in, slight arc) and pays on arrival
+   if(p.type==='coin'&&p.age>p.t1){if(p.hx==null){p.hx=p.x;p.hy=p.y;p.g=p.vx=p.vy=0}const q=Math.min(1,(p.age-p.t1)/p.t2),e=q*q*q;
+    p.x=p.hx+(p.tx-p.hx)*e;p.y=p.hy+(p.ty-p.hy)*e-Math.sin(q*Math.PI)*36;if(q>=1){P.splice(i,1);p.done&&p.done(p.v);continue}}
+   if(p.type==='ring'){const e=1-Math.pow(1-k,3);ctx.globalAlpha=(1-k)*(p.a||1);ctx.strokeStyle=p.c;ctx.lineWidth=Math.max(.5,p.w*(1-k));ctx.beginPath();ctx.arc(p.x,p.y,p.r0+(p.r1-p.r0)*e,0,7);ctx.stroke()}
+   else if(p.type==='glow'){const sz=p.s*(1+k*p.grow);ctx.globalCompositeOperation='lighter';ctx.globalAlpha=(1-k)*(1-k)*p.a;ctx.drawImage(GLOW,p.x-sz/2,p.y-sz/2,sz,sz);ctx.globalCompositeOperation='source-over'}
+   else if(p.type==='token'||p.type==='coin'){ctx.globalAlpha=k>.8?(1-k)*5:1;ctx.setTransform(DPR*Math.max(.08,Math.abs(Math.cos(p.rot))),0,0,DPR,p.x*DPR,p.y*DPR);ctx.drawImage(TOKEN,-p.s/2,-p.s/2,p.s,p.s);ctx.setTransform(DPR,0,0,DPR,0,0)}
    else if(p.type==='spark'){ctx.globalAlpha=1-k;ctx.strokeStyle=k<.3?'#F0C080':'#D9772B';ctx.lineWidth=p.s;ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(p.x-p.vx*.035,p.y-p.vy*.035);ctx.stroke()}
    else if(p.type==='debris'){ctx.globalAlpha=k>.7?(1-k)/.3:1;ctx.fillStyle=p.c;ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.rot);ctx.fillRect(-p.s/2,-p.s/3,p.s,p.s*.66);ctx.restore()}
    else{const sz=p.s*(1+k*p.grow);ctx.globalAlpha=(1-k)*p.a;ctx.drawImage(p.type==='smoke'?SMOKE:DUST,p.x-sz/2,p.y-sz/2,sz,sz)}}
@@ -1808,7 +1860,17 @@ const FX=(()=>{
  const dust=(x,y,n)=>{for(let i=0;i<n;i++)add({type:'dust',x:x+rr(-20,20),y,vx:rr(-60,60),vy:rr(-30,-5),s:rr(18,30),grow:1.2,a:.55,life:rr(.5,.9),drag:.95})};
  const explode=(x,y)=>{sparks(x,y,16,1.1);smoke(x,y,4,.65);const cols=['#5C4838','#30312F','#D4C9AD','#AF9561','#864F3B'];
   for(let i=0;i<10;i++){const a=rr(-Math.PI,0),v=rr(150,480);add({type:'debris',x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,g:1800,s:rr(3,8),c:cols[i%5],life:rr(.7,1.1),vr:rr(-14,14)})}};
- return {tokens,sparks,smoke,dust,explode};
+ // impact: a white ring plus a cone of sparks thrown along ang (radians, screen space: 0 = right)
+ const hit=(x,y,ang,big)=>{add({type:'glow',x,y,s:big?70:34,grow:.6,a:big?.9:.6,life:big?.16:.1});
+  add({type:'ring',x,y,r0:3,r1:big?46:24,w:big?5:3,c:'#fff3d6',life:big?.3:.2});if(big)add({type:'ring',x,y,r0:6,r1:70,w:3,c:'#ffb347',a:.8,life:.42});
+  for(let i=0,n=big?14:6;i<n;i++){const a=ang+rr(-.85,.85),v=rr(240,560)*(big?1.25:1);add({type:'spark',x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v-60,g:700,s:rr(1.2,big?3:2.2),life:rr(.14,.32),drag:.95})}};
+ // death blast: flash, shock ring, then the existing sparks/smoke/debris
+ const boom=(x,y,s=1)=>{add({type:'glow',x,y,s:110*s,grow:.8,a:1,life:.24*s});add({type:'ring',x,y,r0:8,r1:80*s,w:6,c:'#ffd9a0',life:.4});explode(x,y)};
+ // n coins burst from (x,y) and fly to (tx,ty); done(value) runs as each one lands. Without motion they pay at once.
+ const collect=(x,y,vals,tx,ty,done)=>{if(RM()){vals.forEach(v=>done(v));return}
+  vals.forEach((v,i)=>{const a=rr(-Math.PI*.85,-Math.PI*.15),sp=rr(220,420);add({type:'coin',x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,g:1400,s:rr(13,17),vr:rr(8,18),drag:.99,
+   t1:rr(.32,.42)+i*.05,t2:rr(.42,.55),life:9,tx,ty,v,done})})};
+ return {tokens,sparks,smoke,dust,explode,hit,boom,collect};
 })();
 // ---- juice primitives ----
 // trauma shake (Eiserloh, GDC 2016): offset = max * trauma^2 * noise, applied to the cabinet only
@@ -1817,6 +1879,18 @@ function shake(a){if(RM())return;trauma=Math.min(1,trauma+a);if(!shakeRaf){shake
 function shakeTick(t){const dt=(t-shakeLast)/1000;shakeLast=t;trauma=Math.max(0,trauma-dt*1.6);const s=trauma*trauma,M=14,cab=$('.machine');
  if(s<=.0005||!cab){if(cab)cab.style.transform='';shakeRaf=0;return}
  cab.style.transform=`translate3d(${(Math.random()*2-1)*M*s}px,${(Math.random()*2-1)*M*s}px,0) rotate(${(Math.random()*2-1)*1.6*s}deg)`;shakeRaf=requestAnimationFrame(shakeTick)}
+// battlefield camera shake: same trauma model, written to --shx/--shy on #field; CSS moves only the world layers (HUD stays put)
+let camT=0,camRaf=0,camLast=0;const CAM_M=14;
+function camShake(a){if(RM())return;camT=Math.min(1,camT+a);if(!camRaf){camLast=performance.now();camRaf=requestAnimationFrame(camTick)}}
+function camTick(t){const dt=(t-camLast)/1000;camLast=t;camT=Math.max(0,camT-dt*2.2);const s=camT*camT,M=CAM_M,fl=$('#field');
+ if(s<=.0005||!fl){if(fl){fl.style.removeProperty('--shx');fl.style.removeProperty('--shy')}camRaf=0;return}
+ fl.style.setProperty('--shx',((Math.random()*2-1)*M*s).toFixed(1)+'px');fl.style.setProperty('--shy',((Math.random()*2-1)*M*s).toFixed(1)+'px');camRaf=requestAnimationFrame(camTick)}
+// hitstop: freeze the fight for ms (battle steps, sprite clips, every animation on the field); effects started after the call still run
+const HS={until:0};
+function hitstop(ms){if(RM())return;const now=performance.now();if(now<HS.until)return;HS.until=now+ms;
+ for(const el of anims)if(el._a)el._a.t0+=ms; // sprite clips are time-based: push their start so they resume where they froze (tick() skips meanwhile)
+ const fl=$('#field'),an=fl?fl.getAnimations({subtree:true}):[];an.forEach(a=>{try{a.pause()}catch(e){}});
+ setTimeout(()=>an.forEach(a=>{try{if(a.playState==='paused')a.play()}catch(e){}}),ms)}
 const skipWaiters=new Set();let activeAnims=[];
 function wait(ms){if(SL.skip)ms=Math.min(ms,30);return new Promise(r=>{const done=()=>{clearTimeout(id);skipWaiters.delete(done);r()};const id=setTimeout(done,ms);skipWaiters.add(done)})}
 function skipNow(){if(!busy||SL.skip)return;SL.skip=true;bus.emit('slam_stop');activeAnims.forEach(a=>{try{a.playbackRate=6}catch(e){}});[...skipWaiters].forEach(f=>f())}
@@ -2571,8 +2645,9 @@ function startBattle(){
  for(const f of P){const t=f.u&&f.u.type;
   if(t==='commander'){play(sheetOf(f),'rally',{once:1});setTimeout(()=>floatTxt(f,'RALLY!','#b78cff'),250)}
   if(t==='hacker')play(sheetOf(f),'deploy',{once:1})}
- let last=performance.now();
- const loop=now=>{if(!F)return;const dt=Math.min(50,now-last)*speed;last=now;
+ let last=performance.now();crShown=R.credits;
+ const loop=now=>{if(!F)return;if(now<HS.until){last=now;return requestAnimationFrame(loop)} // hitstop: the fight holds
+  const dt=Math.min(50,now-last)*speed;last=now;
   const res=battleTick(dt);drawFighters();
   if(res>0)return endWave(true);if(res<0)return endWave(false);
   requestAnimationFrame(loop)};
@@ -2604,31 +2679,91 @@ function step(f,dt){
  if(f.orb==='jam'){tgt.tm=Math.min(tgt.tm,-tgt.cd*.6);shot(f,tgt,ORBS.jam.c);floatTxt(tgt,'JAMMED','#ffc23d');return}
  if(f.rng>12)shot(f,tgt,f.orb?ORBS[f.orb].c:f.side==='P'?'#ffd23f':'#ff6b85');
  // damage bonuses: Outrider charge (first blow), heavy every 4th blow, Commander aura nearby
- let mul=1;const t=f.u&&f.u.type;
- if(f.charge&&!f.charged){f.charged=1;mul*=f.charge;floatTxt(f,'CHARGE!','#ff8a4c')}
- else if((t==='outrider'||t==='commander')&&f.na%4===0)mul*=1.6;
+ // big = the game's "critical" blows (charge and heavy): they get hitstop, camera shake and a big number
+ let mul=1,big=0;const t=f.u&&f.u.type;
+ if(f.charge&&!f.charged){f.charged=1;mul*=f.charge;big=1;floatTxt(f,'CHARGE!','#ff8a4c')}
+ else if((t==='outrider'||t==='commander')&&f.na%4===0){mul*=1.6;big=1}
  if(f.side==='P'&&!f.orb){const au=alive(F.P).filter(c=>c.aura&&c!==f&&dist(c,f)<=AURA_R).reduce((m,c)=>Math.max(m,c.aura),0);mul*=1+au}
  let hits=[[tgt,1]];
  if(f.all)hits=foes.map(a=>[a,1]);
  else if(f.role==='splash')hits=foes.filter(a=>dist(a,tgt)<=10).map(a=>[a,a===tgt?1:.6]);
  else if(f.splash)hits=foes.filter(a=>dist(a,tgt)<=8).map(a=>[a,a===tgt?1:.5]);
- for(const [a,k] of hits)hurt(a,f.atk*k*mul,f.side,f);
+ for(const [a,k] of hits)hurt(a,f.atk*k*mul,f.side,f,big);
 }
 function atkAnim(f){const s=sheetOf(f);f.na=(f.na||0)+1;f.engaged=1;if(!s)return;const t=kindOf(f),A=ATK[t];
  let c=A[(f.na-1)%A.length];
  if(t==='outrider'&&f.na===1&&f.charge)c='charge';else if((t==='outrider'||t==='commander')&&f.na%4===0)c='heavy';
  play(s,c,{once:1,then:t==='sniper'&&f.na%3===0?'reload':null})}
-function hurt(a,raw,side,src){
+function hurt(a,raw,side,src,big){
  if(a.dodge&&Math.random()<a.dodge){floatTxt(a,'MISS','#53d1ff');return}
  if(a.markT>F.t)raw*=1.3;
  // Lancer shield wall: ranged fire on an ally standing just behind a Lancer is cut by 40%
  if(a.side==='P'&&src&&src.rng>12&&!a.shield&&!a.fly&&alive(F.P).some(L=>L.shield&&L.x>a.x&&L.x-a.x<14&&Math.abs(L.y-a.y)<8)){raw*=.6;floatTxt(a,'BLOCK','#ffc23d')}
- const dmg=Math.max(1,Math.round(raw*(.9+Math.random()*.2)));a.hp=Math.max(0,a.hp-dmg);
- floatTxt(a,'-'+dmg,side==='P'?'#ffd23f':'#ff6b85');fx(a,'hit');
+ const was=a.hp,dmg=Math.max(1,Math.round(raw*(.9+Math.random()*.2)));a.hp=Math.max(0,a.hp-dmg);
+ // enemies on screen get the full hit feedback; the headless sim (no elements) and our own units keep the light version
+ if(a.side==='E'&&a.el&&!F.sim)hitFx(a,dmg,src,big,was>0&&a.hp<=0);
+ else{floatTxt(a,'-'+dmg,side==='P'?'#ffd23f':'#ff6b85');fx(a,'hit')}
  const s=sheetOf(a);if(!s)return;
  if(a.hp<=0)play(s,'death',{hold:1});
  else if(!s._a||s._a.loop){const H=HIT[kindOf(a)];play(s,H[(Math.random()*H.length)|0],{once:1})}
 }
+// ---- enemy hit feedback (live battles only) ----
+// flash white 80 ms → impact ring + sparks → sound → damage number → knock wobble (or, on the killing blow, fling + explode + coins)
+const WHITE='brightness(0) invert(1)';
+function hitFx(a,dmg,src,big,killed){const b=a.el.querySelector('.body');if(!b)return;
+ const dir=src&&src.x>a.x?-1:1; // pushed away from the attacker (+1 = to the right)
+ if(big)hitstop(a.boss?110:85); // first, so the effects below keep playing while the world holds
+ b.animate([{filter:WHITE},{filter:WHITE}],{duration:80});
+ const c=rc(b);FX.hit(c.x+dir*c.w*.12,c.y-c.h*.05,dir>0?0:Math.PI,big);
+ SFX.play(big?'crit':'hit',{vol:big?1:.55,vary:.1});
+ dmgNum(a,dmg,dir,big,b);
+ if(big)camShake(.55);
+ if(killed)return enemyDeath(a,dir,big,b);
+ if(RM())return;
+ const k=big?16:8;b._kn?.cancel();
+ b._kn=b.animate([{transform:'none'},{transform:`translate(${dir*k}%,${-k*.25}%) rotate(${dir*k*.4}deg)`,offset:.22},{transform:`translate(${-dir*k*.35}%,0)`,offset:.55},
+  {transform:`translate(${dir*k*.15}%,0)`,offset:.8},{transform:'none'}],{duration:big?260:190,easing:'ease-out'})}
+// damage number: pops out big (overshoot), hops up, falls back a little and fades. Lives on #field so it survives the death fade.
+function dmgNum(a,dmg,dir,big,b){const fl=$('#field');if(!fl||fl.querySelectorAll('.dmg').length>40)return;
+ const fr=fl.getBoundingClientRect(),br=b.getBoundingClientRect(),s=document.createElement('span');
+ s.className='dmg'+(big?' crit':'');s.textContent=dmg+(big?'!':'');
+ const nx=Math.max(fr.left+26,Math.min(fr.right-26,br.left+br.width/2)),ny=Math.max(fr.top+40,br.top+br.height*.12);
+ s.style.left=((nx-fr.left)/fr.width*100)+'%';s.style.top=((ny-fr.top)/fr.height*100)+'%';
+ s.style.fontSize=Math.round((14+Math.min(9,Math.log2(1+dmg)*1.5))*(big?1.45:1)*(a.boss?1.15:1))+'px';
+ fl.appendChild(s);
+ if(RM()){s.animate([{opacity:1},{opacity:1,offset:.7},{opacity:0}],{duration:700}).onfinish=()=>s.remove();return}
+ const dx=dir*rr(8,22),h=big?46:30,T='translate(-50%,-50%)',tr=(x,y,sc)=>`${T} translate(${x.toFixed(1)}px,${y.toFixed(1)}px) scale(${sc})`;
+ s.animate([
+  {transform:tr(0,0,.2),easing:'cubic-bezier(.15,.9,.3,1.2)'},
+  {transform:tr(dx*.3,-h*.75,big?1.75:1.35),offset:.14,easing:'ease-out'},
+  {transform:tr(dx*.6,-h,1),offset:.34,easing:'cubic-bezier(.55,0,.9,.45)'},
+  {transform:tr(dx,-h*.35,1),opacity:1,offset:.74,easing:'ease-out'},
+  {transform:tr(dx*1.08,-h*.5,.95),offset:.86},
+  {transform:tr(dx*1.15,-h*.45,.9),opacity:0}],{duration:big?1000:760}).onfinish=()=>s.remove()}
+// killing blow: the kill pays its share of the wave's credits now (endWave pays only what is left, so a wave's total is unchanged),
+// then the body is flung away spinning and blows up, and the coins fly to the credits counter
+let crShown=0;
+function enemyDeath(a,dir,big,b){const e=a.el;
+ const n=F.E.length,cr=waveCredits(R.wave),k=F.kills=(F.kills||0)+1,share=Math.floor(cr*k/n)-Math.floor(cr*(k-1)/n);
+ F.paid=(F.paid||0)+share;R.credits+=share;
+ e.classList.add('flung');
+ const boom=()=>{const c=rc(b);e.classList.add('gone');FX.boom(c.x,c.y,a.boss?1.8:1);
+  SFX.play('explode',{vol:a.boss?1:.7,rate:a.boss?.75:1});camShake(a.boss?.95:big?.45:.25);if(a.boss)flashScreen(.35,300);
+  dropCredits(c.x,c.y,share)};
+ if(RM())return boom();
+ const L=a.boss?1.25:1,fr=$('#field').getBoundingClientRect(),br=b.getBoundingClientRect(),cx=br.left+br.width/2,cy=br.top+br.height/2;
+ const side=dir*Math.max(0,Math.min(br.width*.9*L,dir>0?fr.right-30-cx:cx-fr.left-30)),up=Math.max(0,Math.min(br.height*1.1*L,cy-fr.top-50));
+ b.animate([{transform:'none'},{transform:`translate(${(side*.55).toFixed(1)}px,${-up}px) rotate(${dir*150}deg) scale(.95)`,offset:.45},
+  {transform:`translate(${side.toFixed(1)}px,${(-up*.6).toFixed(1)}px) rotate(${dir*300}deg) scale(.8)`}],
+  {duration:a.boss?700:420,delay:big?85:0,easing:'cubic-bezier(.3,.7,.5,1)',fill:'forwards'}).onfinish=boom}
+function dropCredits(x,y,v){if(!v)return;
+ const tgt=['#hudCredits svg','#hudCredits','#shop small','#shop2c'].map(q=>$(q)).filter(Boolean).map(el=>el.getBoundingClientRect())
+  .find(r=>r.width>0&&r.bottom>0&&r.top<innerHeight&&r.right>0&&r.left<innerWidth);
+ const n=Math.min(v,6),vals=Array.from({length:n},(_,i)=>Math.floor(v/n)+(i<v%n?1:0));
+ if(!tgt){FX.tokens(x,y,n,.7);showCredits(crShown=Math.min(R.credits,crShown+v));return}
+ FX.collect(x,y,vals,tgt.left+tgt.width/2,tgt.top+tgt.height/2,val=>{showCredits(crShown=Math.min(R.credits,crShown+val));SFX.play('coin',{vol:.35,vary:.1})})}
+function showCredits(c){const h=$('#hudCredits b'),a=$('#shop small'),b=$('#shop2c');if(h)h.textContent=c;if(a)a.textContent=c+'c';if(b)b.textContent=c+' credits';
+ const el=h?$('#hudCredits'):a?.closest('button')||b?.closest('button');if(el&&!RM())el.animate([{transform:'scale(1)'},{transform:'scale(1.14)',filter:'brightness(1.5)'},{transform:'scale(1)'}],{duration:200})}
 function separate(arr){const l=alive(arr).filter(f=>!f.orb||f.out);
  for(let i=0;i<l.length;i++)for(let j=i+1;j<l.length;j++){const a=l[i],b=l[j];if(!a.fly!==!b.fly)continue;let dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy);
   if(d<5.5){if(d<.01){dx=0;dy=1;d=1}const p=(5.5-d)/2;a.x-=dx/d*p;a.y-=dy/d*p;b.x+=dx/d*p;b.y+=dy/d*p}}
@@ -2654,7 +2789,7 @@ function endWave(won){
  // Units that fell come back next turn (owner rule, 2026-11-25): the army is kept whole.
  f.E.forEach(e=>{if(e.hp<=0)Codex.unlock(e.boss?'boss':'kill',e.t)});setTimeout(()=>Codex.flush(),1200);
  setTimeout(()=>{
-  if(won){const bonus=isBoss(R.wave)?10:isElite(R.wave)?5:0,cr=waveCredits(R.wave);R.credits+=cr;
+  if(won){const bonus=isBoss(R.wave)?10:isElite(R.wave)?5:0,cr=waveCredits(R.wave);R.credits+=cr-(f.paid||0); // kills already paid their share
    if(R.wave>=R.depth)return finish(true); // final wave: the run ends, no core drop
    // no "wave cleared" screen (owner: distracting): roll straight into the next turn; the reward shows as a toast
    const tier=dropTier(R.wave),boss=isBoss(R.wave),show=()=>{closeModal();nextTurn();toast(`${boss?'Boss down · ':''}+${cr} credits${bonus?` (${boss?'boss':'elite'} bonus)`:''} · +${perTurn()} energy`,'#ffd23f')};

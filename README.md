@@ -21,6 +21,7 @@ Then open http://127.0.0.1:8811/.
 | `assets/units/<id>/sheet-v2.*` | Baked unit sprite sheets. |
 | `art/` | Painted art: slot symbols, cores, UI and backgrounds. |
 | `lab/` | Test benches: roster, battle, slot feel, ground calibration, map. |
+| `audio/` | Game sounds the page loads (`<name>.mp3`). Originals go in `audio/src/`; `python3 tools/prep-audio.py` trims and levels them into `audio/`. |
 | `tools/` | Art generation, the 3D bake pipeline (Meshy → Blender → sprite sheets) and the balance sim (`tools/sim-run.mjs`, `?sim=1`). |
 | `docs/` | Design doc, art brief, slot feel, style guide. |
 

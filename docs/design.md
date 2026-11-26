@@ -1664,3 +1664,9 @@ Per-wave shape after the change:
   - a sold-out stall;
   - a tap on an offer you can't take (not enough credits, no free slot, core bag full).
 - **Threat is shown, not hidden.** The home screen shows `Threat +X%` (`threatPct(w)`) with its wave 1 value and its value at the chosen depth. The upgrades footer notes that each upgrade level adds 1.7%.
+
+## Hit feedback and sound (2026-11-26)
+- **Enemy hits (live battles only; the sim and our own units keep the old light version).** `hitFx()`: an 80 ms white flash, an impact ring plus sparks thrown away from the attacker, the hit sound, a damage number that pops out big, hops and falls back (`dmgNum()`, on `#field` so it outlives the death fade), and a short knock wobble.
+- **"Crits" are the existing big blows** (Outrider charge, the heavy every 4th blow of Outriders and Commanders). The game has no random crit. They add a hitstop (`hitstop(ms)`: the fight, sprite clips and field animations hold ~85 ms), a camera shake on the field's world layers (`camShake()`, `--shx/--shy`) and an orange `N!` number.
+- **Kills.** `enemyDeath()`: the body is flung up and away (clamped inside the field), explodes (`FX.boom`) and drops credit coins that fly to the HUD counter. Each kill pays its share of `waveCredits()` at once and the win pays only the rest, so a wave's total is unchanged.
+- **Sound.** `SFX` (Web Audio) on the cue bus: `roll` loops from the pull until the last reel lands; `win` on any paying action, `lose` on a spin that pays nothing (failed nudges/blasts stay silent); `hit`, `crit` (falls back to a deeper `hit`), `explode`, `coin`, `lever`. Every play varies the pitch by up to ±6% (±10% for hits and coins). Files: `audio/<name>.mp3`, made from `audio/src/` by `tools/prep-audio.py`, which prints the `SFX.trim` levels. No lever sound yet.
