@@ -8,13 +8,22 @@ For each sound in CUTS:
      Whatever a file still lacks after that is printed as a JS `trim` map for SFX.trim in game.src.html,
      so quiet files are lifted in the mix instead of having their transients squashed by a limiter.
 
-Sounds not listed in CUTS are skipped. Needs ffmpeg. Run from anywhere: python3 tools/prep-audio.py
+Sounds not listed in CUTS are skipped.
+
+Music: every file in audio/src/music/ (git-ignored masters) becomes audio/music/<slug>.mp3, e.g.
+"Diesel Run.mp3" -> diesel-run.mp3. Silence is trimmed at both ends (so one track flows into the next),
+loudness is set to MUSIC_LUFS (background level, under the effects) with two-pass loudnorm, and it is
+encoded at 160 kbps CBR (small, and CBR seeks precisely, which the game needs to resume a track).
+Put the slug in a playlist in SFX.lists (game.src.html).
+
+Needs ffmpeg. Run from anywhere: python3 tools/prep-audio.py
 """
-import pathlib, re, subprocess
+import json, pathlib, re, subprocess
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SRC, OUT = ROOT / 'audio' / 'src', ROOT / 'audio'
 TARGET_RMS, PEAK_CEIL = -18.0, -1.0  # dBFS
+MUSIC_LUFS, MUSIC_TP = -20.0, -1.5  # integrated loudness and true peak for music
 
 # name: (max length after the onset in s, fade-out in s). roll keeps only its steady part (the game loops it).
 CUTS = {
@@ -66,3 +75,24 @@ for name, (length, fade) in CUTS.items():
     print(f'{name:8s} onset {on * 1000:4.0f} ms  kept {length}s  rms {rms:6.1f} -> {rms + gain:6.1f}  peak {peak:5.1f} -> {peak + gain:5.1f}  gain {gain:+5.1f} dB')
 
 print('SFX.trim =', '{' + ','.join(f'{k}:{v}' for k, v in trims.items()) + '}')
+
+
+def slug(stem):
+    return re.sub(r'[^a-z0-9]+', '-', stem.lower()).strip('-')
+
+
+MSRC, MOUT = SRC / 'music', OUT / 'music'
+TRIM = 'silenceremove=start_periods=1:start_threshold=-50dB:start_silence=0.05,areverse,' \
+       'silenceremove=start_periods=1:start_threshold=-50dB:start_silence=0.3,areverse'
+for src in sorted(MSRC.glob('*')) if MSRC.exists() else []:
+    if src.suffix.lower() not in ('.mp3', '.wav', '.ogg', '.flac'):
+        continue
+    MOUT.mkdir(exist_ok=True)
+    out = MOUT / f'{slug(src.stem)}.mp3'
+    norm = f'loudnorm=I={MUSIC_LUFS}:TP={MUSIC_TP}:LRA=11'
+    m = json.loads(re.search(r'\{[^{}]*"input_i"[^{}]*\}', ff('-i', str(src), '-af', f'{TRIM},{norm}:print_format=json', '-f', 'null', '-')).group(0))
+    meas = f":measured_I={m['input_i']}:measured_TP={m['input_tp']}:measured_LRA={m['input_lra']}:measured_thresh={m['input_thresh']}:offset={m['target_offset']}:linear=true"
+    ff('-y', '-i', str(src), '-af', f'{TRIM},{norm}{meas},afade=t=in:d=0.03', '-ar', '44100', '-c:a', 'libmp3lame', '-b:a', '160k', str(out))
+    probe = subprocess.run(['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', str(out)], capture_output=True, text=True).stdout.strip()
+    print(f'music {src.name:28s} -> {out.name:26s} {float(probe):6.1f}s  loudness {float(m["input_i"]):6.1f} -> {MUSIC_LUFS} LUFS')
+

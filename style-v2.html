@@ -1781,13 +1781,25 @@ const SFX={ctx:null,buf:{},nz:{},bus:{},track:null,last:{},gap:{hit:45,crit:60,e
   const set=(n,v)=>{if(now||c.state!=='running'){n.gain.cancelScheduledValues(0);n.gain.value=v}else n.gain.setTargetAtTime(v,c.currentTime,.03)}; // a paused clock never reaches a ramp
   set(this.bus.master,settings.mute?0:G(settings.master));for(const [k] of this.CATS)set(this.bus[k],G(settings[k]))},
  out(name){return this.bus[this.cat[name]||'sfx']},
- // music(name): loop audio/music/<name>.mp3 on the music bus, cross-fading from the current track; music(null) fades out
- music(name,fade=1.5){const c=this.init();if(!c)return;const old=this.track;if(old&&old.name===name)return;
-  if(old){old.g.gain.setTargetAtTime(0,c.currentTime,fade/4);setTimeout(()=>{old.el.pause();old.g.disconnect()},fade*1000+300)}
-  this.track=null;if(!name)return;
-  const el=new Audio(`audio/music/${name}.mp3`),g=c.createGain();el.loop=true;g.gain.value=0;
-  c.createMediaElementSource(el).connect(g).connect(this.bus.music);g.gain.setTargetAtTime(1,c.currentTime,fade/4);
-  el.play().catch(()=>{});this.track={name,el,g}}, // blocked before the first tap: the gesture listener below retries
+ // ---- music: playlists of tracks (audio/music/<slug>.mp3, made by tools/prep-audio.py) streamed on the music bus ----
+ // A playlist plays its tracks in order and starts over; each track hands over to the next XF seconds before its end (cross-fade).
+ // Switching playlists fades the old one out and remembers its track and time, so coming back resumes instead of restarting.
+ lists:{prep:['desert-protocol','desert-protocol-02'],battle:['brass-and-bullets','diesel-run'],boss:['boss-battle-groove']},
+ pos:{},list:null,track:null,XF:3,
+ playlist(name,fade=1.2){const c=this.init();if(!c||name===this.list)return;
+  if(this.track){this.pos[this.list]={i:this.track.i,t:this.track.el.currentTime||0};this.fadeOut(this.track,fade)}
+  this.list=name;this.track=null;if(!this.lists[name])return;
+  const p=this.pos[name]||{i:0,t:0};this.startTrack(p.i,p.t,fade*1.25)},
+ startTrack(i,t,fade){const c=this.ctx,L=this.lists[this.list];i%=L.length;
+  const el=new Audio(`audio/music/${L[i]}.mp3`),g=c.createGain(),tr={el,g,i};el.preload='auto';
+  c.createMediaElementSource(el).connect(g).connect(this.bus.music);this.track=tr;
+  if(t>0)el.addEventListener('loadedmetadata',()=>{el.currentTime=Math.min(t,Math.max(0,el.duration-this.XF-1))},{once:true});
+  const next=()=>{if(this.track!==tr||tr.handed)return;tr.handed=1;this.fadeOut(tr,this.XF);this.startTrack(i+1,0,this.XF*.6)};
+  el.addEventListener('timeupdate',()=>{if(el.duration&&el.currentTime>el.duration-this.XF)next()});el.addEventListener('ended',next);
+  g.gain.setValueAtTime(0,c.currentTime);g.gain.linearRampToValueAtTime(1,c.currentTime+fade);
+  el.play().catch(()=>{});return tr}, // blocked before the first tap: the gesture listener below retries
+ fadeOut(tr,fade){const t=this.ctx.currentTime,G=tr.g.gain;G.cancelScheduledValues(t);G.setValueAtTime(G.value,t);G.linearRampToValueAtTime(0,t+fade);
+  setTimeout(()=>{tr.el.pause();tr.el.removeAttribute('src');tr.el.load();tr.g.disconnect()},fade*1000+200)},
  async load(name,url){const c=this.init();if(!c)return;try{const r=await fetch(url);if(!r.ok)return;this.buf[name]=await c.decodeAudioData(await r.arrayBuffer())}catch(e){}},
  // vary: every play nudges the pitch by up to ±vary (6% by default) so repeats never sound identical
  play(name,{vol=1,rate=1,vary=.06,loop=false}={}){const c=this.ctx;if(!c)return null;const now=performance.now();if(now-(this.last[name]||0)<(this.gap[name]||0))return null;this.last[name]=now;
@@ -2822,7 +2834,7 @@ function shot(a,b,col){if(F&&F.sim)return;const fl=$('#field');if(!fl)return;con
  const ms=Math.round(200/speed);requestAnimationFrame(()=>{p.style.transition=`left ${ms}ms linear,top ${ms}ms linear`;p.style.left=x1+'%';p.style.top=y1+'%'});
  setTimeout(()=>p.remove(),ms+40)}
 function endWave(won){
- const f=F;F=null;
+ const f=F;F=null;syncMusic(); // the fight is over: back to the prep music, where it left off
  if(won)f.P.forEach(p=>{if(p.hp>0&&!p.orb)play(sheetOf(p),'win',{hold:1})});
  // Units that fell come back next turn (owner rule, 2026-11-25): the army is kept whole.
  f.E.forEach(e=>{if(e.hp<=0)Codex.unlock(e.boss?'boss':'kill',e.t)});setTimeout(()=>Codex.flush(),1200);
@@ -3080,7 +3092,10 @@ function hudHTML(){
   <div class="hg"><span class="stat ${full?'full':''}" id="hudUnits" title="Units on the field / army allowance">${IC.units}<b>${army().length}/${cap()}</b><i>units</i></span></div>
   <div class="hg hg-wave"><span class="stat" title="Incursion wave">${IC.wave}<b>${w}/${R.depth}</b><i>wave</i></span><span class="stat hide-s ${isBoss(w)?'hot':''}" title="Next boss">${IC.skull}<b>${boss}</b></span></div></div>`}
 function bindHud(){Codex.badge();renderEbar()}
+// music follows the phase: battle music while a fight runs (boss waves have their own), prep music everywhere else (home included)
+function syncMusic(){SFX.playlist(F&&R?(isBoss(R.wave)?'boss':'battle'):'prep')}
 function render(keepModal){
+ syncMusic();
  if(view==='home')return renderHome();
  $('#app').innerHTML=`<div class="game tab-${mtab}"><div class="slotcol"></div><div class="centercol">${hudHTML()}<div class="fieldcol"></div><div class="toasts" id="toasts"></div></div><nav class="actrail" id="tabs" aria-label="Actions"></nav></div>`;
  $('#app').classList.add('ingame');renderField();renderSlotCol();renderTabs();bindHud();

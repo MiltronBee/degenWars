@@ -95,8 +95,17 @@ http.createServer((req, res) => {
   if (!file.startsWith(ROOT + path.sep) || BLOCK.test(p)) { res.writeHead(404); return res.end('not found'); }
   fs.stat(file, (err, st) => {
     if (err || !st.isFile()) { res.writeHead(404); return res.end('not found'); }
-    res.writeHead(200, { 'Content-Type': MIME[path.extname(file).toLowerCase()] || 'application/octet-stream',
-      'Content-Length': st.size, 'Cache-Control': p.endsWith('.html') ? 'no-cache' : 'max-age=300' });
+    const head = { 'Content-Type': MIME[path.extname(file).toLowerCase()] || 'application/octet-stream',
+      'Cache-Control': p.endsWith('.html') ? 'no-cache' : 'max-age=300', 'Accept-Ranges': 'bytes' };
+    // byte ranges: the browser needs them to seek in audio (music resumes where it left off)
+    const m = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');
+    if (m && (m[1] || m[2])) {
+      let a = m[1] ? +m[1] : Math.max(0, st.size - +m[2]), b = m[1] && m[2] ? Math.min(+m[2], st.size - 1) : st.size - 1;
+      if (a > b || a >= st.size) { res.writeHead(416, { 'Content-Range': `bytes */${st.size}` }); return res.end(); }
+      res.writeHead(206, { ...head, 'Content-Range': `bytes ${a}-${b}/${st.size}`, 'Content-Length': b - a + 1 });
+      return fs.createReadStream(file, { start: a, end: b }).pipe(res);
+    }
+    res.writeHead(200, { ...head, 'Content-Length': st.size });
     fs.createReadStream(file).pipe(res);
   });
 }).listen(PORT, '127.0.0.1', () => console.log(`degenWars on http://127.0.0.1:${PORT}`));
