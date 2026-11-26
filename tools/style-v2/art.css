@@ -1,0 +1,110 @@
+/* ================= ART LAYER (painted UI art, see docs/style.md "Art") =================
+   Painted textures from tools/gen-art.py (art/ui-*.webp) laid under the v2 colours.
+   Textures always sit under a dark/light wash so text keeps AA contrast. Button plates are
+   stretched to the button (center/100% 100%) so their painted edge wear reads as a bevel;
+   CSS keeps the 1px border, inset highlight and drop shadow. Disabled = the steel plate,
+   desaturated and buried under a dark wash. !important is used because v2/base rules on
+   buttons are very specific; an !important rule beats them whatever their specificity.          */
+:root{
+ --u-steel:url(art/ui-steel.webp) center/cover no-repeat;
+ --u-paper:url(art/ui-paper.webp) center/cover no-repeat;
+ --u-crate:url(art/ui-crate.webp) center/cover no-repeat;
+ --u-canvas:url(art/ui-canvas.webp) center/cover no-repeat;
+ --p-steel:url(art/ui-btn-steel.webp) center/100% 100% no-repeat;
+ --p-red:url(art/ui-btn-red.webp) center/100% 100% no-repeat;
+ --p-oxide:url(art/ui-btn-oxide.webp) center/100% 100% no-repeat;
+ --p-brass:url(art/ui-btn-brass.webp) center/100% 100% no-repeat;
+ /* surfaces */
+ --a-panel:linear-gradient(180deg,rgba(30,31,30,.50),rgba(18,19,18,.66)),var(--u-steel),#222423;
+ --a-deep:linear-gradient(180deg,rgba(16,17,16,.72),rgba(10,11,10,.84)),var(--u-steel),#161716;
+ --a-paper:linear-gradient(180deg,rgba(236,228,206,.18),rgba(160,140,100,.10)),var(--u-paper),#d4c9ad;
+ /* plates */
+ --a-btn:linear-gradient(180deg,rgba(255,255,255,.05),rgba(0,0,0,.22)),var(--p-steel),#485354;
+ --a-spin:linear-gradient(180deg,rgba(255,220,200,.08),rgba(40,4,2,.22)),var(--p-red),#B3261E;
+ --a-war:linear-gradient(180deg,rgba(255,220,200,.04),rgba(30,8,4,.30)),var(--p-oxide),#864F3B;
+ --a-brass:linear-gradient(180deg,rgba(255,244,214,.18),rgba(60,40,10,.10)),var(--p-brass),#C9A23A;
+ --a-off:linear-gradient(rgba(30,31,30,.80),rgba(26,27,26,.86)),var(--p-steel),#262826;
+ --i-codex:url(art/ui-i-codex.webp);--i-shop:url(art/ui-i-shop.webp);--i-kit:url(art/ui-i-kit.webp);
+ --i-speed:url(art/ui-i-speed.webp);--i-battle:url(art/ui-i-battle.webp);--i-energy:url(art/ui-i-energy.webp);
+ --i-credit:url(art/ui-i-credit.webp);--i-chip:url(art/ui-i-chip.webp);--i-units:url(art/ui-i-units.webp);--i-wave:url(art/ui-i-wave.webp)}
+
+/* --- 1. panels, trays, rail, info, modals: painted steel plate --- */
+.panel,.info,.wrap.ingame .info,.tray,.actrail,.fwrap,.centercol,.parts{background:var(--a-panel)!important}
+.wrap.ingame .hud{background:linear-gradient(180deg,rgba(40,43,43,.55),rgba(26,28,28,.72)),var(--u-steel),#262928!important}
+.controls{background:var(--a-deep)!important}
+.modal{background:linear-gradient(180deg,rgba(32,34,33,.62),rgba(20,21,20,.80)),var(--u-steel),#1f2120!important}
+.opt{background:linear-gradient(180deg,rgba(46,48,47,.72),rgba(30,32,31,.86)),var(--u-steel),#272928!important}
+.opt:disabled{filter:grayscale(.6)}
+.kdetail{background:linear-gradient(rgba(14,15,14,.72),rgba(14,15,14,.82)),var(--u-steel)!important}
+
+/* --- 2. buttons: painted plates --- */
+.btn,.rb,.nudges button,.bm-x,.hbtn,.cc-scrap button,.shopbtn{background:var(--a-btn)!important}
+.rb{border-color:#56605f!important}
+.btn.gold:not(.spinbtn){background:var(--a-brass)!important;color:#1d1a14;text-shadow:0 1px 0 rgba(255,240,200,.35)}
+.btn.red,.battlebtn{background:var(--a-war)!important;text-shadow:0 1px 1px rgba(0,0,0,.65)}
+.btn.spinbtn,.machine .btn.spinbtn{background:var(--a-spin)!important;text-shadow:0 1px 1px #3a0703}
+.hbtn.on{background:var(--a-spin)!important}
+/* the Black Market price tag is a manila field tag */
+.otag{background:var(--a-paper)!important;color:#211E1B}
+.olock.on{background:var(--a-paper)!important}
+/* hover / pressed (transform + shadow from v2 still apply) */
+.btn:hover:not(:disabled),.rb:hover:not(:disabled),.nudges button:hover:not(:disabled),.otag:hover:not(:disabled){filter:brightness(1.12) saturate(1.05)}
+.btn:active:not(:disabled),.rb:active:not(:disabled),.nudges button:active:not(:disabled){filter:brightness(.92)}
+/* disabled: desaturated steel under a dark wash, dim text, no glow */
+.btn:disabled,.btn.gold:disabled,.btn.red:disabled,.btn.spinbtn:disabled,.machine .btn.spinbtn:disabled,
+.rb:disabled,.nudges button:disabled,.battlebtn:disabled,.otag:disabled{
+ background:var(--a-off)!important;filter:grayscale(1)!important;color:#77786f!important;text-shadow:none!important;box-shadow:none!important;border-color:#343736!important}
+
+/* --- 3. field-document paper --- */
+.stamp:not(.core):not(.grey):not(.chain){background:var(--a-paper)}
+.stamp.t4{background:linear-gradient(rgba(182,173,148,.35),rgba(182,173,148,.35)),var(--u-paper)}
+.stamp.chain{background:linear-gradient(rgba(175,149,97,.72),rgba(175,149,97,.72)),var(--u-paper)}
+.cc-plate{background:var(--a-paper)!important}
+.parts .opt .price{background:var(--a-paper)!important}
+.lvtag{background:linear-gradient(rgba(185,160,108,.70),rgba(185,160,108,.70)),var(--u-paper)!important}
+
+/* --- 4. Core Cache: olive crate; Black Market: canvas awning --- */
+.cc-crate{background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(0,0,0,.28)),var(--u-crate),#545641!important}
+.cc-lid{background:linear-gradient(rgba(40,44,44,.35),rgba(20,22,22,.55)),var(--u-steel)!important}
+.cc-back{background:radial-gradient(circle at 50% 50%,#1a1b1a 0 22%,transparent 23%),linear-gradient(rgba(60,66,66,.30),rgba(30,34,34,.55)),var(--u-steel)!important}
+.bm{background:linear-gradient(180deg,rgba(26,27,26,.78),rgba(14,15,14,.92)),var(--u-steel),#171817!important}
+.bm-awn{background:repeating-linear-gradient(90deg,rgba(134,79,59,.85) 0 34px,rgba(212,201,173,.55) 34px 68px),url(art/ui-canvas.webp) 0 0/400px auto!important;background-blend-mode:multiply}
+.bm-head{background:linear-gradient(180deg,rgba(20,21,20,.55),rgba(20,21,20,.88)),url(art/ui-canvas.webp) center/cover}
+.ocard{background:linear-gradient(170deg,rgba(44,46,45,.70),rgba(24,25,24,.88)),var(--u-steel)!important}
+.bm-foot{background:linear-gradient(rgba(22,23,22,.86),rgba(14,15,14,.94)),var(--u-steel)!important}
+.hero{background:linear-gradient(180deg,rgba(18,18,17,.3),rgba(18,18,17,.8) 42%,rgba(20,20,19,.96)),url(art/field.webp) center top/cover,#1e1f1d}
+.lvl{background:linear-gradient(rgba(32,34,33,.78),rgba(26,28,27,.86)),var(--u-steel)!important}
+.lvl.on{background:linear-gradient(rgba(72,83,84,.55),rgba(50,58,58,.70)),var(--u-steel)!important}
+.parts .opt{background:var(--a-btn)!important}
+
+/* --- 5. painted icons: the inline SVG stays (layout, a11y) but draws the painting instead --- */
+#hudCodex>svg,#shop>svg,#shop2>svg,#parts>svg,#spd>svg,#fight2>svg,
+#hudEnergy>svg,#hudCredits>svg,#hudChips>svg,#hudUnits>svg,.hg-wave>.stat:first-child>svg,#bmCr>svg{
+ background:center/contain no-repeat;filter:drop-shadow(0 1px 1px rgba(0,0,0,.8))}
+#hudCodex>svg>*,#shop>svg>*,#shop2>svg>*,#parts>svg>*,#spd>svg>*,#fight2>svg>*,
+#hudEnergy>svg>*,#hudCredits>svg>*,#hudChips>svg>*,#hudUnits>svg>*,.hg-wave>.stat:first-child>svg>*,#bmCr>svg>*{display:none}
+#hudCodex>svg{background-image:var(--i-codex)}
+#shop>svg,#shop2>svg{background-image:var(--i-shop)}
+#parts>svg{background-image:var(--i-kit)}
+#spd>svg{background-image:var(--i-speed)}
+#fight2>svg{background-image:var(--i-battle)}
+#hudEnergy>svg{background-image:var(--i-energy)}
+#hudCredits>svg,#bmCr>svg{background-image:var(--i-credit)}
+#hudChips>svg{background-image:var(--i-chip)}
+#hudUnits>svg{background-image:var(--i-units)}
+.hg-wave>.stat:first-child>svg{background-image:var(--i-wave)}
+.rb>svg{width:30px;height:30px}
+.battlebtn>svg{width:48px;height:48px}
+.hud .stat>svg{width:21px;height:21px}
+.shopbtn>svg{width:26px;height:26px}
+#bmCr>svg{width:26px;height:26px}
+.rb:disabled>svg,.battlebtn:disabled>svg{filter:grayscale(1) brightness(.6);opacity:.55}
+/* chip "dots" on home and the run-over screen become the painted chip */
+.stat>.dot[style*="--blue"]{width:20px!important;height:20px!important;border-radius:0!important;background:var(--i-chip) center/contain no-repeat!important;box-shadow:none!important;filter:drop-shadow(0 1px 1px rgba(0,0,0,.8))}
+
+@media(max-width:979px){
+ .rb>svg{width:24px;height:24px}
+ .battlebtn>svg{width:26px;height:26px}
+ .hud .stat>svg{width:17px;height:17px}
+}
+@media(max-width:380px){.rb>svg{width:22px;height:22px}.battlebtn>svg{width:20px;height:20px}}

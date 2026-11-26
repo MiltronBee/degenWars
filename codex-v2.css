@@ -1,0 +1,128 @@
+/* degenWars Codex: an intelligence archive in the cabinet's materials (soot, brass, typewritten paper) */
+.cx{position:fixed;inset:0;z-index:300;display:none;background:rgba(8,6,4,.86);backdrop-filter:blur(3px);padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left))}
+.cx.show{display:block;animation:cxIn .22s ease-out}
+@keyframes cxIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.cx-in{height:100%;max-width:1400px;margin:0 auto;display:grid;grid-template-columns:230px 280px minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);gap:0;background:linear-gradient(#1d1712,#15100c);border:1px solid #6a5232;border-radius:18px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.cx-top{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #4a3a28;background:linear-gradient(#2a2119,#1d1712)}
+.cx-brand{font-family:var(--f-disp);font-size:22px;color:#e8c98a;letter-spacing:.04em}
+.cx-brand span{font-family:var(--f-ui);font-size:13px;color:#b5a58a;letter-spacing:0;margin-left:10px}
+.cx-x{min-width:44px;min-height:44px;border-radius:10px;background:#2a2119;border:1px solid #6a5232;color:#efe4cf;font-size:18px;cursor:pointer}
+.cx-cats{overflow:auto;padding:10px;border-right:1px solid #3a2d20;display:flex;flex-direction:column;gap:4px}
+.cx-cat{text-align:left;background:none;border:1px solid transparent;border-radius:10px;padding:9px 11px;color:#efe4cf;cursor:pointer;min-height:44px}
+.cx-cat b{display:block;font-size:15px}
+.cx-cat small{color:#b5a58a;font-size:12px}
+.cx-cat small i{color:#e8a34a;font-style:normal}
+.cx-cat:hover{background:#241c15}
+.cx-cat.on{background:#2d2319;border-color:#8a6a3a}
+.cx-list{overflow:auto;padding:10px;border-right:1px solid #3a2d20}
+.cx-list h3{font-family:var(--f-disp);font-weight:400;font-size:16px;color:#e8c98a;margin:4px 6px 10px}
+.cx-item{display:block;width:100%;text-align:left;background:none;border:1px solid transparent;border-radius:10px;padding:8px 10px;color:#efe4cf;cursor:pointer;position:relative;min-height:44px}
+.cx-item b{display:block;font-size:15px;padding-right:68px}
+.cx-item small{color:#b5a58a;font-size:12px}
+.cx-item em{position:absolute;right:10px;top:9px;font-style:normal;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#c2523a;border:1px solid #c2523a;border-radius:4px;padding:1px 4px}
+.cx-item:hover{background:#241c15}
+.cx-item.on{background:#2d2319;border-color:#8a6a3a}
+.cx-item.locked b{color:#6f6252;letter-spacing:-.05em}
+.cx-item.new::before{content:"";position:absolute;left:-1px;top:12px;width:4px;height:18px;border-radius:2px;background:#e8a34a}
+.cx-doc{overflow:auto;padding:20px clamp(16px,3vw,40px) 40px;color:#e6dac2;font:16px/1.65 var(--f-ui)}
+.cx-doc h2{font-family:var(--f-disp);font-weight:400;font-size:clamp(28px,3vw,38px);line-height:1.1;margin:8px 0 4px;color:#f3e6c9}
+.cx-sub{color:#c9a46a;margin:0 0 14px;font-size:15px}
+.cx-doc p{max-width:68ch}
+.cx-plate{margin:0 0 14px;position:relative;aspect-ratio:16/8;border-radius:12px;overflow:hidden;border:1px solid #6a5232;background:url(art/cabinet.webp) center/cover;box-shadow:inset 0 0 80px rgba(0,0,0,.6)}
+.cx-plate img{width:100%;height:100%;object-fit:cover;display:block}
+.cx-plate.none::after{content:"Plate pending";position:absolute;inset:0;display:grid;place-items:center;font:700 13px var(--f-ui);letter-spacing:.2em;text-transform:uppercase;color:rgba(239,228,207,.5);background:rgba(20,14,10,.55)}
+.cx-plate-k{position:absolute;left:12px;bottom:10px;font:700 11px var(--f-ui);letter-spacing:.18em;color:#efe4cf;background:rgba(15,10,7,.75);padding:3px 8px;border-radius:4px;z-index:1}
+.cx-head{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;font-size:13px;color:#b5a58a}
+.cx-class{font:700 12px var(--f-ui);letter-spacing:.16em;text-transform:uppercase;color:#c2523a;border:2px solid #c2523a;border-radius:4px;padding:2px 8px;transform:rotate(-2deg)}
+.cx-stats{border-collapse:collapse;margin:18px 0;min-width:min(100%,420px);font-size:14px}
+.cx-stats th{text-align:left;color:#c9a46a;font-weight:600;padding:6px 16px 6px 0;border-bottom:1px solid #3a2d20;white-space:nowrap;vertical-align:top}
+.cx-stats td{padding:6px 0;border-bottom:1px solid #3a2d20;color:#efe4cf}
+.cx-notes{margin:18px 0 6px;max-width:68ch;padding:12px 14px;background:#22301f;border:1px solid #4f6b45;border-radius:10px;color:#dfe8d2;font-size:15px}
+.cx-notes b{display:block;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#a9c78f;margin-bottom:3px}
+.cx-narr{font-size:13px;color:#8e7f68;font-style:italic}
+.cx-empty{color:#8e7f68;padding:40px;text-align:center}
+.cx-sealed{min-height:60%;display:grid;place-content:center;text-align:center;gap:10px}
+.cx-seal{font:400 clamp(30px,5vw,54px) var(--f-disp);color:#c2523a;border:4px solid #c2523a;border-radius:8px;padding:6px 22px;transform:rotate(-6deg);opacity:.85}
+.cx-sealed p{color:#b5a58a;max-width:40ch}
+.cx-back{display:none;margin-bottom:10px;background:#2a2119;border:1px solid #6a5232;color:#efe4cf;border-radius:10px;padding:8px 14px;min-height:40px;font:600 14px var(--f-ui);cursor:pointer}
+/* tablet: categories become chips on top */
+@media(max-width:1000px){
+  .cx-in{grid-template-columns:260px minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr)}
+  .cx-cats{grid-column:1/-1;flex-direction:row;overflow-x:auto;border-right:0;border-bottom:1px solid #3a2d20;padding:8px}
+  .cx-cat{flex:0 0 auto;padding:6px 12px}
+  .cx-cat b{font-size:14px}
+}
+/* phone: list, then the dossier full width */
+@media(max-width:700px){
+  .cx{padding:0}
+  .cx-in{border-radius:0;border:0;grid-template-columns:minmax(0,1fr)}
+  .cx-list{border-right:0}
+  .cx-doc{display:none;padding:14px 16px 40px}
+  .cx.reading .cx-list,.cx.reading .cx-cats{display:none}
+  .cx.reading .cx-doc{display:block}
+  .cx-back{display:inline-block}
+}
+/* "New dossier" stamp */
+.cx-stamp{position:fixed;z-index:310;right:max(16px,env(safe-area-inset-right));bottom:calc(96px + env(safe-area-inset-bottom));display:flex;flex-direction:column;align-items:flex-start;gap:1px;text-align:left;min-width:200px;max-width:300px;background:#efe2c4;color:#2a1d12;border:2px solid #8a6a3a;border-radius:6px;padding:10px 14px 10px 16px;box-shadow:0 10px 30px rgba(0,0,0,.55);cursor:pointer;transform:rotate(-1.5deg);animation:cxStamp .35s cubic-bezier(.2,1.6,.4,1)}
+.cx-stamp-k{font:700 11px var(--f-ui);letter-spacing:.18em;text-transform:uppercase;color:#a3301e;border:2px solid #a3301e;border-radius:3px;padding:0 6px;margin-bottom:4px}
+.cx-stamp b{font:400 18px var(--f-disp)}
+.cx-stamp small{font-size:12px;color:#6a5232}
+.cx-stamp.out{opacity:0;transform:translateY(10px) rotate(-1.5deg);transition:.35s}
+@keyframes cxStamp{from{opacity:0;transform:scale(1.6) rotate(-8deg)}to{opacity:1;transform:rotate(-1.5deg)}}
+@media(min-width:980px){.cx-stamp{bottom:24px}}
+/* entry buttons in the game UI */
+.cx-open{position:relative}
+.cx-open [data-codex-badge]{position:absolute;top:-6px;right:-6px;min-width:20px;height:20px;border-radius:10px;background:#c2523a;color:#fff;font:700 12px/20px var(--f-ui);text-align:center;padding:0 5px}
+@media(prefers-reduced-motion:reduce){.cx.show,.cx-stamp{animation:none}}
+/* ===== Codex v2: steel archive cabinet, typed dossier paper. Fonts/tokens come from the page (style-v2) ===== */
+.cx{background:rgba(10,10,9,.86)}
+.cx-in{background:var(--grain),linear-gradient(180deg,#232524,#1a1b1a);border:1px solid var(--line);border-radius:6px;box-shadow:inset 0 0 0 1px #000,0 20px 60px rgba(0,0,0,.6)}
+.cx-top{border-bottom:1px solid var(--rule);background:var(--grain),linear-gradient(180deg,#2e3131,#232626)}
+.cx-brand{font-family:var(--f-disp);font-size:24px;color:var(--ink);letter-spacing:.14em;text-transform:uppercase}
+.cx-brand span{font-family:var(--f-mono);font-size:12px;color:var(--mute);letter-spacing:.04em;text-transform:none}
+.cx-x{border-radius:4px;background:linear-gradient(180deg,#56605f,#3f4748 55%,#353c3d);border:1px solid #66706f;color:var(--ink)}
+.cx-cats{border-right:1px solid var(--rule)}
+.cx-cat,.cx-item{border-radius:4px;color:var(--ink);font-family:var(--f-ui)}
+.cx-cat b,.cx-item b{font-weight:700;font-size:16px;letter-spacing:.03em}
+.cx-cat small,.cx-item small{color:var(--mute);font-size:13px}
+.cx-cat small i{color:#d9772b}
+.cx-cat:hover,.cx-item:hover{background:#2a2c2b}
+.cx-cat.on,.cx-item.on{background:#323736;border-color:var(--ink2);box-shadow:inset 3px 0 0 var(--ochre)}
+.cx-list{border-right:1px solid var(--rule)}
+.cx-list h3{font-family:var(--f-ui);font-weight:700;font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--label);padding-bottom:6px;border-bottom:1px solid var(--rule)}
+.cx-item em{font-family:var(--f-ui);font-weight:700;letter-spacing:.16em;color:#d9675a;border-color:#a8402e;border-radius:2px}
+.cx-item.locked b{color:#6f716b}
+.cx-item.new::before{border-radius:0;background:#d9772b}
+.cx-doc{color:#d6d2c6;font:400 14.5px/1.72 var(--f-mono)}
+.cx-doc h2{font-family:var(--f-disp);font-weight:400;letter-spacing:.06em;color:var(--bone);text-transform:uppercase}
+.cx-sub{color:var(--label);font-family:var(--f-ui);font-weight:600;font-size:16px;letter-spacing:.04em}
+.cx-plate{border-radius:4px;border:1px solid var(--line)}
+.cx-plate.none::after{font:600 12px var(--f-mono);letter-spacing:.2em;background:rgba(20,20,19,.6)}
+.cx-plate-k{font:600 11px var(--f-mono);letter-spacing:.12em;border-radius:2px;color:var(--ink2);background:rgba(16,17,16,.8)}
+.cx-head{font-family:var(--f-mono);font-size:12px;color:var(--mute)}
+.cx-class{font:400 13px var(--f-disp);letter-spacing:.18em;color:#c0392b;border-color:#b3261e;border-radius:2px}
+.cx-stats{font-family:var(--f-mono);font-size:13px}
+.cx-stats th{color:var(--label);font-family:var(--f-ui);font-weight:700;letter-spacing:.12em;text-transform:uppercase;font-size:12px;border-bottom:1px solid var(--rule)}
+.cx-stats td{color:var(--ink);border-bottom:1px solid var(--rule)}
+.cx-notes{border-radius:2px;background:var(--grain),linear-gradient(180deg,#d8cfb6,#c9bfa2);border:0;border-left:3px solid #864F3B;color:#2a2621;font:500 14px/1.6 var(--f-mono);box-shadow:0 4px 12px rgba(0,0,0,.4)}
+.cx-notes b{font-family:var(--f-ui);font-weight:700;letter-spacing:.2em;color:#864F3B}
+.cx-narr{color:#8d8f88;font-family:var(--f-mono)}
+.cx-empty{color:var(--mute);font-family:var(--f-mono)}
+.cx-seal{font-family:var(--f-disp);color:#b3261e;border:3px solid #b3261e;border-radius:2px;letter-spacing:.1em}
+.cx-sealed p{color:var(--mute);font-family:var(--f-mono)}
+.cx-back{font:700 14px var(--f-ui);letter-spacing:.1em;text-transform:uppercase;border-radius:4px;background:linear-gradient(180deg,#56605f,#3f4748 55%,#353c3d);border:1px solid #66706f;color:var(--ink)}
+/* NEW DOSSIER: an ivory field slip with a cadmium rubber stamp */
+.cx-stamp{background:var(--grain),linear-gradient(180deg,#dfd6bf,#cfc4a6);color:#211E1B;border:1px solid #8f8466;border-radius:2px;box-shadow:inset 0 0 18px rgba(92,72,56,.25),0 10px 30px rgba(0,0,0,.55)}
+.cx-stamp-k{font:400 12px var(--f-disp);letter-spacing:.2em;color:#B3261E;border:2px solid #B3261E;border-radius:1px;padding:1px 6px 0;transform:rotate(-2deg)}
+.cx-stamp b{font:400 19px var(--f-disp);letter-spacing:.06em;text-transform:uppercase}
+.cx-stamp small{font:500 11px var(--f-mono);color:#5c4838;letter-spacing:.02em}
+.cx-open [data-codex-badge]{background:#B3261E;color:#f6efe2;font:700 12px/20px var(--f-num,sans-serif);border-radius:2px}
+.cx-cats,.cx-list,.cx-doc{scrollbar-color:#4a5251 #1a1b1a;scrollbar-width:thin}
+/* ===== Codex art layer (painted textures from art/ui-*.webp, see docs/style.md "Art") ===== */
+.cx-in{background:linear-gradient(180deg,rgba(32,34,33,.62),rgba(20,21,20,.80)),url(art/ui-steel.webp) center/cover,#1f2120}
+.cx-top{background:linear-gradient(180deg,rgba(44,47,47,.50),rgba(30,32,32,.72)),url(art/ui-steel.webp) center/cover,#2b2e2e}
+.cx-x,.cx-back{background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(0,0,0,.22)),url(art/ui-btn-steel.webp) center/100% 100% no-repeat,#485354}
+.cx-x:hover,.cx-back:hover{filter:brightness(1.12)}
+.cx-notes{background:linear-gradient(180deg,rgba(236,228,206,.16),rgba(160,140,100,.10)),url(art/ui-paper.webp) center/cover,#d4c9ad}
+.cx-stamp{background:linear-gradient(180deg,rgba(236,228,206,.20),rgba(160,140,100,.08)),url(art/ui-paper.webp) center/cover,#dfd6bf}
+.cx-open [data-codex-badge]{background:linear-gradient(rgba(255,220,200,.06),rgba(40,4,2,.2)),url(art/ui-btn-red.webp) center/100% 100%,#B3261E}

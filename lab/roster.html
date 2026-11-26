@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>degenWars · Roster lab</title>
+<style>
+:root{--bg:#211e1b;--ink:#ddd9ce;--mute:#a58f70;--line:#5c4838}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:15px/1.4 system-ui,sans-serif}
+.wrap{display:flex;flex-direction:column;height:100%;padding:10px max(10px,env(safe-area-inset-left)) max(10px,env(safe-area-inset-bottom))}
+header{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px}
+header b{font-size:18px;margin-right:8px}
+.grp{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-right:10px}
+.grp span{color:var(--mute);font-size:13px;margin-right:2px}
+button{background:#30312f;color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:6px 10px;min-height:36px;font:600 13px system-ui;cursor:pointer}
+button.go{border-color:#af9561;color:#af9561}
+#game{flex:1;min-height:0;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+p{color:var(--mute);margin:6px 0 0;font-size:13px}
+</style></head>
+<body><div class="wrap">
+<header><b>Roster lab</b><button id="go" class="go">Battle scene</button><button id="hit">Take a hit</button><span id="units"></span></header>
+<div id="game"></div>
+<p>The whole battle roster on the real field, field look. "Battle scene" plays a formation: Longshots at the back aim and rail-shoot; Grunts march and fire; the Commander rallies (an aura pulse that lights up the line) and fights; the Deployer, tucked behind the Lancer shield wall, launches its four orbs (scout ?, mark +, jam, patch repairs the Lancers); Outriders charge the flank with mixed attacks; Wasps strafe overhead. "Take a hit" makes everyone flinch. Each group of buttons plays one clip on every copy of that unit.</p>
+</div>
+<script src="../vendor/phaser-3.90.0.min.js"></script>
+<script>
+{
+// every sheet in the lab: id -> path under assets/units (the orb is one model in four role colours)
+const SHEET={soldier:'soldier/sheet-v2',outrider:'outrider/sheet-v2',drone:'drone/sheet-v2',sniper:'sniper/sheet-v2',lancer:'lancer/sheet-v2',
+  commander:'commander/sheet-v2',hacker:'hacker/sheet-v2','orb-scout':'orb/sheet-scout','orb-mark':'orb/sheet-mark','orb-jam':'orb/sheet-jam','orb-patch':'orb/sheet-patch'};
+const UNITS=Object.keys(SHEET);
+const KIND=u=>u.startsWith('orb-')?'orb':u;             // clip buttons are per kind: one "orb" group drives all four roles
+const NAME={soldier:'Grunt',outrider:'Outrider',drone:'Wasp',sniper:'Longshot',lancer:'Lancer',commander:'Commander',hacker:'Deployer',orb:'Orbs'};
+const FLYER={drone:true,'orb-scout':true,'orb-mark':true,'orb-jam':true,'orb-patch':true};   // sprite hovers above its foot point; shadow stays on the ground
+const ROLE={'orb-scout':{c:0x6f8fa0,x:0.72,y:0.78},'orb-mark':{c:0xc0392b,x:0.67,y:0.85},'orb-jam':{c:0xe0a526,x:0.77,y:0.91},'orb-patch':{c:0x8fbf4a,x:0.56,y:0.84}};
+const W=1600,H=900, META={};
+const QS=new URLSearchParams(location.search), STILL=QS.get('still')==='1';
+const HOLD=STILL&&QS.get('hold')==='1'?1e5:1;           // ?still=1&hold=1 freezes the effects, for checking where they sit
+// Outrider melee. f = contact frame (1-based), dx/dy = drill tip from the foot point in metres (facing right, y up is negative).
+const ATK={attack1:{f:3,dx:1.25,dy:-1.75},attack2:{f:3,dx:2.25,dy:-0.74},attack3:{f:4,dx:1.3,dy:-0.66},heavy:{f:4,dx:0.62,dy:0,heavy:true}};
+const PPM=H*0.09;                                       // world scale: screen px per metre before the lane perspective
+const VARIANTS=['attack1','attack2','attack3'], HEAVY='heavy', HEAVY_EVERY=4, HITS=['hit1','hit2','hit3','hit'];
+const MUZZLE={drone:[0.30,0.38]};                       // chin gun from the foot point: x in display widths, y in display heights (up)
+const ORANGE=0xf0a040;
+const has=(u,c)=>!!(META[u]&&META[u].clips[c]);
+const pick=(list,last)=>{const v=list.length>1?list.filter(x=>x!==last):list;return v[Math.floor(Math.random()*v.length)]};
+let scene=null;
+
+class Field extends Phaser.Scene{
+  constructor(){super('field')}
+  preload(){
+    this.load.image('field','../art/field.webp');
+    this.load.image('fgtufts','../art/fg-tufts.webp'); this.load.json('fgtufts-j','../art/fg-tufts.json');
+    for(const u of UNITS)this.load.spritesheet(u,`../assets/units/${SHEET[u]}.webp?t=${Date.now()}`,{frameWidth:META[u].frameWidth,frameHeight:META[u].frameHeight});
+  }
+  create(){
+    scene=this;
+    const bg=this.add.image(W/2,H/2,'field');bg.setScale(Math.max(W/bg.width,H/bg.height));
+    for(const u of UNITS){const j=META[u];for(const [n,c] of Object.entries(j.clips))
+      this.anims.create({key:u+':'+n,frames:this.anims.generateFrameNumbers(u,{start:c.row*j.cols,end:c.row*j.cols+c.n-1}),frameRate:c.fps,repeat:c.loop?-1:0});}
+    // soft round shadow texture
+    const g=this.make.graphics({x:0,y:0,add:false});for(let i=16;i>0;i--){g.fillStyle(0x211e1b,0.06);g.fillEllipse(64,16,128*i/16,32*i/16)}g.generateTexture('shadow',128,32);
+    const tj=this.cache.json.get('fgtufts-j'), tt=this.textures.get('fgtufts');tj.frames.forEach(([x,y,w,h],i)=>tt.add('c'+i,0,x,y,w,h));
+    this.army=[];
+    const add=(u,x,y)=>{const j=META[u],fly=!!FLYER[u],s=this.add.sprite(0,H*y,u).setOrigin(j.foot[0],j.foot[1]);
+      // a sheet that knows its world scale (ppm = sheet px per metre, tools/pack-unit.py) is drawn at it; older sheets fit their frame height
+      const k=(j.ppm?PPM/j.ppm:H*0.30/j.frameHeight)*(0.85+y*0.2), sw=(j.ppm?3.2*j.ppm:j.frameWidth)*k, sh=(j.ppm?3.4*j.ppm:j.frameHeight)*k;s.setScale(k).setDepth(y*1000+(fly?60:0));s.u=u;s.homeX=W*x;s.lane=y;s.fly=fly;s.seq=0;s.loop=null;
+      s.shadow=this.add.image(0,0,'shadow').setDepth(y*1000-1).setAlpha(fly?0.4:0.8);s.shadow.setDisplaySize(sw*(fly?0.42:0.7),sh*(fly?0.055:0.09));s.m=j.ppm?j.ppm*k:sh/3.4;   // s.m = screen px per metre
+      this.army.push(s);return s};
+    // formation, back to front: Longshots, Grunts, Commander, Deployer behind the Lancer shield wall; Outriders charge the flank, flyers overhead
+    const F={sniper:[[0.13,0.81],[0.09,0.91]],soldier:[[0.28,0.80],[0.23,0.89],[0.32,0.95]],commander:[[0.36,0.85]],hacker:[[0.43,0.88]],
+      lancer:[[0.52,0.82],[0.50,0.92]],outrider:[[0.46,0.83],[0.42,0.93]],drone:[[0.61,0.81],[0.55,0.90]]};
+    for(const [u,list] of Object.entries(F))if(has(u,'idle'))list.forEach(([x,y])=>add(u,x,y));
+    // the Deployer's orbs: hidden until it launches them
+    this.orbs=[];for(const u of Object.keys(ROLE))if(has(u,'idle')){const o=add(u,ROLE[u].x,ROLE[u].y);o.role=ROLE[u];o.setVisible(false);o.shadow.setVisible(false);this.orbs.push(o)}
+    // foreground tufts over the feet
+    for(let i=0;i<9;i++){const f=this.add.image(80+i*180+Math.random()*60,H*(0.95+Math.random()*0.04),'fgtufts','c'+(i%tj.frames.length));f.setOrigin(0.5,1).setScale(0.55).setDepth(2000)}
+    if(STILL)this.still();else this.battle();
+  }
+  // ?still=1 places everyone for a headless screenshot. Optional &pose=<clip>:<frame> freezes the Outriders on one frame.
+  still(){const [pc,pf]=(QS.get('pose')||'').split(':');
+    const POSE={sniper:'aim',lancer:'attack1',commander:'rally',hacker:'hack'};
+    for(const s of this.army){s.x=s.u==='outrider'?W*0.79+(s.lane-0.8)*200:s.homeX;
+      if(s.role){s.setVisible(true);s.shadow.setVisible(true)}
+      const c=s.u==='outrider'?(has(s.u,pc)?pc:'charge'):s.role?'idle':(POSE[s.u]||'shoot');this.play(s,c);
+      if(s.u==='outrider'&&pf!==undefined&&pf!==''){const fr=s.anims.currentAnim.frames[+pf];if(fr)s.anims.pause(fr);if(ATK[c])this.impact(s,ATK[c])}
+      if(s.fly&&HOLD>1)this.tracer(s)}
+  }
+  update(){for(const s of this.army){s.shadow.x=s.x+(s.fly?0:6);s.shadow.y=s.y-2;const a=s.anims.currentAnim;s.shadow.visible=s.visible&&(s.fly||!(a&&a.key.endsWith(':death')&&s.anims.currentFrame&&s.anims.currentFrame.index>4))}}
+  play(s,c){if(this.anims.exists(s.u+':'+c))s.play(s.u+':'+c,true)}
+  // Every behaviour chain belongs to one "seq". stop() starts a new one, so callbacks left over from the old chain do nothing.
+  stop(s){s.seq++;s.loop=null;this.tweens.killTweensOf(s);s.off('animationupdate');s.clearTint()}
+  after(s,c,fn){const q=s.seq;s.once('animationcomplete-'+s.u+':'+c,()=>{if(s.seq===q)fn()})}
+  wait(s,ms,fn){const q=s.seq;this.time.delayedCall(ms,()=>{if(s.seq===q)fn()})}
+  begin(s,loop){s.loop=loop;loop()}                     // s.loop = what to go back to after a hit reaction
+  // walk a ground unit in from the left edge to its formation spot, then start its behaviour loop
+  march(s,ms,delay,then){s.x=-150-Math.random()*220;this.play(s,'walk');
+    this.tweens.add({targets:s,x:s.homeX,duration:ms,delay,onComplete:()=>this.begin(s,then)})}
+  battle(){let nd=0;
+    for(const o of this.orbs){this.stop(o);o.setVisible(false);o.shadow.setVisible(false);o.launched=false}
+    for(const s of this.army){if(s.role)continue;this.stop(s);s.setFlipX(false);
+      if(s.u==='soldier')this.march(s,2600,0,()=>this.fire(s));
+      else if(s.u==='sniper')this.march(s,2400,300,()=>this.snipe(s));
+      else if(s.u==='lancer')this.march(s,2900,0,()=>this.guard(s));
+      else if(s.u==='commander')this.march(s,3000,200,()=>this.command(s,true));
+      else if(s.u==='hacker')this.march(s,2800,400,()=>this.deploy(s));
+      else if(s.fly){s.x=-220-(nd++)*190;this.play(s,'fly');
+        this.tweens.add({targets:s,x:s.homeX,duration:2700,delay:1300,ease:'Sine.easeOut',onComplete:()=>this.begin(s,()=>this.strafe(s))});}
+      else{s.x=-300;s.nAtk=0;s.lastAtk=null;this.play(s,'run');
+        this.tweens.add({targets:s,x:W*0.74+(s.lane-0.8)*200,duration:1900,delay:900,ease:'Sine.easeIn',onComplete:()=>this.charge(s)});}
+    }
+  }
+  fire(s){this.play(s,'shoot');this.after(s,'shoot',()=>{this.flash(s);this.wait(s,300+Math.random()*700,()=>this.fire(s))})}
+  charge(s){this.play(s,'charge');this.tweens.add({targets:s,x:s.x+70,duration:420,ease:'Quad.easeOut'});
+    this.after(s,'charge',()=>{this.shake(90,0.003);this.begin(s,()=>this.attack(s))})}
+  // Outrider melee loop: a random variant, never the same twice running; every HEAVY_EVERY-th blow is the heavy one.
+  attack(s){s.nAtk=(s.nAtk||0)+1;
+    const v=VARIANTS.filter(c=>has(s.u,c)), heavy=has(s.u,HEAVY)&&s.nAtk%HEAVY_EVERY===0;
+    const c=heavy?HEAVY:(v.length?pick(v,s.lastAtk):'attack');if(!heavy)s.lastAtk=c;
+    if(!has(s.u,c))return;
+    this.strike(s,c);this.after(s,c,()=>this.wait(s,(heavy?450:250)+Math.random()*500,()=>this.attack(s)))}
+  // play one attack clip and fire the impact puff when it reaches its contact frame
+  strike(s,c){const a=ATK[c],q=s.seq,key=s.u+':'+c;this.play(s,c);if(!a)return;
+    const up=(anim,frame)=>{if(s.seq!==q||anim.key!==key){s.off('animationupdate',up);return}
+      if(frame.index>=a.f){s.off('animationupdate',up);this.impact(s,a)}};
+    s.on('animationupdate',up)}
+  // ---- Longshot: aim, a long rail shot across the field, sometimes reload ----
+  snipe(s){s.nShot=(s.nShot||0)+1;this.play(s,'aim');
+    this.wait(s,700+Math.random()*900,()=>{this.play(s,'shoot');
+      this.after(s,'shoot',()=>{this.rail(s);
+        if(s.nShot%3===0&&has(s.u,'reload')){this.play(s,'reload');this.after(s,'reload',()=>this.snipe(s))}else this.snipe(s)})})}
+  rail(s){const dir=s.flipX?-1:1,mx=s.x+dir*1.55*s.m,my=s.y-1.95*s.m,d=s.depth+1;
+    this.fade(this.add.circle(mx,my,9,ORANGE,0.95).setDepth(d).setBlendMode('ADD'),{scale:2.6,alpha:0},140);
+    this.fade(this.add.line(0,0,mx,my,mx+dir*(W*0.75),my+Math.random()*40-10,0xffd090,0.9).setOrigin(0).setLineWidth(3).setDepth(d),{alpha:0},220);
+    this.shake(50,0.0012)}
+  // ---- Lancer: holds the shield wall, jabs with the pike now and then ----
+  guard(s){this.play(s,'idle');this.wait(s,900+Math.random()*1600,()=>{
+    const c=pick(['attack1','attack2'].filter(x=>has(s.u,x)),s.lastAtk);s.lastAtk=c;this.play(s,c);this.after(s,c,()=>this.guard(s))})}
+  // ---- Commander: rallies (an aura pulse that lights up the line), then fights; rallies again every few blows ----
+  command(s,first){if(first||s.nCmd%5===0){this.play(s,'rally');this.after(s,'rally',()=>{this.aura(s);s.nCmd=1;this.wait(s,400,()=>this.command(s))});return}
+    s.nCmd++;const heavy=s.nCmd%4===0&&has(s.u,'heavy'),c=heavy?'heavy':pick(['attack1','attack2'].filter(x=>has(s.u,x)),s.lastAtk);
+    if(!heavy)s.lastAtk=c;this.play(s,'idle');
+    this.wait(s,700+Math.random()*1100,()=>{this.play(s,c);this.after(s,c,()=>{if(heavy)this.shake(140,0.004);this.command(s)})})}
+  aura(s){const y=s.y-4,d=s.depth-3;
+    for(let i=0;i<2;i++)this.time.delayedCall(i*180,()=>this.fade(this.add.ellipse(s.x,y,40,12,ORANGE,0).setStrokeStyle(3,ORANGE,0.9).setDepth(d),{scaleX:14,scaleY:9,alpha:0},900));
+    for(const o of this.army)if(o!==s&&!o.fly&&o.visible&&Math.abs(o.x-s.x)<W*0.22){o.setTint(0xffc070);this.time.delayedCall(260,()=>o.clearTint())}}
+  // ---- Deployer: launches its orbs one by one, then keeps hacking ----
+  deploy(s){const next=this.orbs.find(o=>!o.launched);
+    if(!next){this.play(s,'hack');return}
+    this.play(s,'deploy');this.after(s,'deploy',()=>{this.launch(s,next);this.wait(s,200,()=>this.deploy(s))})}
+  launch(s,o){o.launched=true;this.stop(o);o.x=s.x+0.3*s.m;o.setVisible(true).setAlpha(0);o.shadow.setVisible(true);this.play(o,'fly');
+    this.tweens.add({targets:o,alpha:1,duration:200});
+    this.tweens.add({targets:o,x:o.homeX,duration:1300+Math.random()*500,ease:'Sine.easeInOut',onComplete:()=>this.begin(o,()=>this.orbit(o))})}
+  // an orb hovers, then pulses its role at a spot on the ground ahead: scout = scan, mark = crosshair, jam = jagged ring, patch = repair on the wall
+  orbit(o){this.play(o,'idle');this.wait(o,900+Math.random()*1400,()=>{this.play(o,'shoot');this.after(o,'shoot',()=>{this.pulse(o);this.orbit(o)})})}
+  pulse(o){const c=o.role.c,ox=o.x,oy=o.y-1.6*o.m,patch=o.u==='orb-patch',tx=patch?ox-0.2*o.m:ox+(1.2+Math.random()*1.4)*o.m,ty=o.y+4,d=o.depth+1;
+    this.fade(this.add.line(0,0,ox,oy,tx,ty,c,0.75).setOrigin(0).setLineWidth(2).setDepth(d),{alpha:0},260);
+    const r=this.add.ellipse(tx,ty,26,8,c,0).setStrokeStyle(2,c,0.95).setDepth(d-2);this.fade(r,{scaleX:3.2,scaleY:3.2,alpha:0},520);
+    if(o.u==='orb-mark')this.fade(this.add.text(tx,ty-20,'+',{font:'bold 26px system-ui',color:'#e05a40'}).setOrigin(0.5).setDepth(d),{y:ty-50,alpha:0},600);
+    if(o.u==='orb-scout')this.fade(this.add.text(tx,ty-20,'?',{font:'bold 22px system-ui',color:'#9fc3d4'}).setOrigin(0.5).setDepth(d),{y:ty-48,alpha:0},600);
+    if(patch)for(const u of this.army)if(u.u==='lancer'&&u.visible){u.setTint(0xb8e07a);this.time.delayedCall(240,()=>u.clearTint())}}
+  // Wasp: hover, fire a burst, hover
+  strafe(s){this.play(s,'idle');this.wait(s,500+Math.random()*900,()=>{this.play(s,'shoot');this.after(s,'shoot',()=>{this.tracer(s);this.strafe(s)})})}
+  // hit demo: a random hit reaction (not the same twice running), then back to whatever the unit was doing
+  hurt(s){const a=s.anims.currentAnim;if(!s.visible||(a&&a.key.endsWith(':death')))return;
+    const hs=HITS.filter(c=>has(s.u,c));if(!hs.length)return;
+    if(!s.loop&&this.tweens.isTweening(s))return;        // still marching in or mid-charge: let it arrive first
+    const c=s.lastHit=pick(hs,s.lastHit), resume=s.loop;
+    this.stop(s);s.loop=resume;s.setTint(0xffb070);this.wait(s,90,()=>s.clearTint());
+    this.tweens.add({targets:s,x:s.x-(s.flipX?-9:9),duration:70,yoyo:true,ease:'Quad.easeOut'});
+    s.anims.stop();this.play(s,c);this.after(s,c,()=>resume?resume():this.play(s,'idle'))}
+  shake(ms,amt){if(!STILL)this.cameras.main.shake(ms,amt)}
+  fade(o,to,ms){this.tweens.add({targets:o,...to,duration:ms*HOLD,ease:'Quad.easeOut',onComplete:()=>o.destroy()})}
+  // drill contact: a flash and a few sparks in warning orange, no textures. Heavy = ground stab, sparks fan upwards.
+  impact(s,a){const dir=s.flipX?-1:1,x=s.x+dir*a.dx*s.m,y=s.y+a.dy*s.m,big=!!a.heavy,d=s.depth+1;
+    this.fade(this.add.circle(x,y,big?15:10,ORANGE,0.85).setDepth(d).setBlendMode('ADD'),{scale:big?2.6:1.9,alpha:0},big?210:130);
+    for(let i=0,n=big?9:5;i<n;i++){
+      const ang=big?-Math.PI*(0.12+0.76*Math.random()):(Math.random()-0.5)*2.0, r=(big?64:40)*(0.45+Math.random()), z=big?5:4;
+      this.fade(this.add.rectangle(x,y,z,z,ORANGE,0.95).setDepth(d).setAngle(Math.random()*90),
+        {x:x+dir*Math.cos(ang)*r,y:y+Math.sin(ang)*r+(big?0:10),alpha:0,scale:0.4},200+Math.random()*180)}
+    if(big)this.fade(this.add.ellipse(x,y+2,26,7,ORANGE,0.35).setDepth(d-2),{scaleX:4.2,scaleY:2.2,alpha:0},320);
+    this.shake(big?160:60,big?0.0055:0.0015)}
+  flash(s){const mx=s.x+s.displayWidth*0.42,my=s.y-s.displayHeight*0.52;
+    const f=this.add.circle(mx,my,10,0xf0a040,0.9).setDepth(s.depth+1).setBlendMode('ADD');this.tweens.add({targets:f,scale:2.2,alpha:0,duration:120,onComplete:()=>f.destroy()});
+    const t=this.add.line(0,0,mx,my,mx+260+Math.random()*200,my+Math.random()*30-15,0xffc070,0.7).setOrigin(0).setLineWidth(2).setDepth(s.depth+1);this.tweens.add({targets:t,alpha:0,duration:140,onComplete:()=>t.destroy()})}
+  // Wasp chin gun: orange tracer angled slightly down at the ground ahead
+  tracer(s){const m=MUZZLE[s.u]||[0.3,0.38],dir=s.flipX?-1:1,mx=s.x+dir*s.displayWidth*m[0],my=s.y-s.displayHeight*m[1],d=s.depth+1;
+    this.fade(this.add.circle(mx,my,7,ORANGE,0.9).setDepth(d).setBlendMode('ADD'),{scale:2,alpha:0},110);
+    const len=300+Math.random()*180;
+    this.fade(this.add.line(0,0,mx,my,mx+dir*len,my+len*0.2+Math.random()*16-8,ORANGE,0.8).setOrigin(0).setLineWidth(2).setDepth(d),{alpha:0},150)}
+}
+
+Promise.all(UNITS.map(u=>fetch(`../assets/units/${SHEET[u]}.json`,{cache:'no-cache'}).then(r=>r.json()).then(j=>META[u]=j).catch(()=>{}))).then(()=>{
+  for(const u of UNITS)if(!META[u]){delete SHEET[u];UNITS.splice(UNITS.indexOf(u),1)}   // a unit whose sheet is missing is simply left out
+  new Phaser.Game({type:Phaser.AUTO,parent:'game',backgroundColor:'#211e1b',scale:{mode:Phaser.Scale.FIT,autoCenter:Phaser.Scale.CENTER_BOTH,width:W,height:H},scene:Field});
+  const box=document.getElementById('units'), kinds=[...new Set(UNITS.map(KIND))];
+  box.innerHTML=kinds.map(k=>{const u=UNITS.find(x=>KIND(x)===k);return `<span class="grp"><span>${NAME[k]||k}</span>${Object.keys(META[u].clips).map(c=>`<button data-k="${k}" data-c="${c}">${c}</button>`).join('')}</span>`}).join('');
+  box.querySelectorAll('button').forEach(b=>b.onclick=()=>{if(!scene)return;const c=b.dataset.c;
+    for(const s of scene.army)if(KIND(s.u)===b.dataset.k){scene.stop(s);s.x=s.homeX;if(s.role){s.setVisible(true).setAlpha(1);s.shadow.setVisible(true)}
+      if(c==='shoot'&&s.fly){scene.play(s,c);scene.after(s,c,()=>scene.tracer(s))}
+      else if(c==='shoot'&&s.u==='soldier')scene.begin(s,()=>scene.fire(s));
+      else if(c==='shoot'&&s.u==='sniper'){scene.play(s,c);scene.after(s,c,()=>scene.rail(s))}
+      else if(c==='shoot'&&s.role){scene.play(s,c);scene.after(s,c,()=>scene.pulse(s))}
+      else if(c==='rally'){scene.play(s,c);scene.after(s,c,()=>scene.aura(s))}
+      else if(ATK[c]&&s.u==='outrider')scene.strike(s,c);
+      else scene.play(s,c)}});
+  document.getElementById('go').onclick=()=>scene&&scene.battle();
+  document.getElementById('hit').onclick=()=>{if(scene)for(const s of scene.army)scene.hurt(s)};
+}).catch(e=>{document.getElementById('game').textContent='Could not load a sprite sheet: '+e.message});
+}
+</script>
+</body></html>

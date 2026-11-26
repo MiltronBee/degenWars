@@ -1,0 +1,928 @@
+{
+ "soldier": {
+  "yaw": 55,
+  "elev": 12,
+  "frame": 256,
+  "prop": {
+   "file": "/mnt/echostore/frag-arena/_incoming/Rifle/Rifle.glb",
+   "bone": "RightHand",
+   "from": "RightForeArm",
+   "parent": "RightForeArm",
+   "pose": "idle",
+   "length": 0.4,
+   "forward": 0.05,
+   "roll": 90,
+   "flip": 1,
+   "note": "forearm-mounted cannon (owner's pick); a custom Meshy cannon can replace the Quaternius rifle later"
+  },
+  "clips": [
+   [
+    "idle",
+    8,
+    true
+   ],
+   [
+    "walk",
+    10,
+    true
+   ],
+   [
+    "shoot",
+    6,
+    false
+   ],
+   [
+    "hit",
+    4,
+    false
+   ],
+   [
+    "death",
+    8,
+    false
+   ],
+   [
+    "win",
+    8,
+    false
+   ]
+  ],
+  "fps": {
+   "idle": 8,
+   "walk": 12,
+   "shoot": 14,
+   "hit": 12,
+   "death": 10,
+   "win": 8
+  },
+  "retarget": {
+   "align": "arms",
+   "arm_spread": 6,
+   "arm_forward": 0,
+   "note": "tools/retarget.py unit=soldier: align A-pose arm rest to the UAL T-pose; arm_spread swings hanging arms outwards (deg) to clear the hull"
+  },
+  "eyes": {
+   "lenses": [
+    [
+     1642,
+     834,
+     16
+    ],
+    [
+     1609,
+     852,
+     17
+    ],
+    [
+     1632,
+     876,
+     19
+    ]
+   ],
+   "plate": [
+    1590,
+    800,
+    1690,
+    905
+   ],
+   "color": [
+    1.0,
+    0.32,
+    0.04
+   ],
+   "strength": 3,
+   "plate_rgb": [
+    0.32,
+    0.31,
+    0.3
+   ],
+   "disc_strength": 0.45,
+   "disc_scale": 1.15
+  }
+ },
+ "outrider": {
+  "yaw": 55,
+  "elev": 12,
+  "frame": 342,
+  "prop": {
+   "file": "~/degenWars/assets/props/drill.glb",
+   "bone": "RightHand",
+   "from": "RightForeArm",
+   "parent": "RightForeArm",
+   "pose": "idle",
+   "length": 0.3,
+   "forward": 0.25,
+   "roll": 0,
+   "flip": 1,
+   "note": "ram drill spike (Meshy dropped it); tools/make-props.py"
+  },
+  "clips": [
+   [
+    "idle",
+    8,
+    true
+   ],
+   [
+    "walk",
+    10,
+    true
+   ],
+   [
+    "run",
+    8,
+    true
+   ],
+   [
+    "charge",
+    8,
+    false
+   ],
+   [
+    "attack1",
+    6,
+    false
+   ],
+   [
+    "attack2",
+    8,
+    false
+   ],
+   [
+    "attack3",
+    10,
+    false
+   ],
+   [
+    "heavy",
+    12,
+    false
+   ],
+   [
+    "hit1",
+    4,
+    false
+   ],
+   [
+    "hit2",
+    5,
+    false
+   ],
+   [
+    "hit3",
+    6,
+    false
+   ],
+   [
+    "death",
+    8,
+    false
+   ],
+   [
+    "win",
+    8,
+    false
+   ]
+  ],
+  "fps": {
+   "idle": 8,
+   "walk": 12,
+   "run": 14,
+   "charge": 14,
+   "attack1": 14,
+   "attack2": 14,
+   "attack3": 14,
+   "heavy": 12,
+   "hit1": 12,
+   "hit2": 12,
+   "hit3": 12,
+   "death": 10,
+   "win": 8
+  },
+  "retarget": {
+   "align": "arms",
+   "arm_spread": 4,
+   "arm_forward": 0
+  },
+  "clipmap": {
+   "idle": "Idle_Loop",
+   "walk": "Jog_Fwd_Loop",
+   "run": "Sprint_Loop",
+   "charge": "Shield_Dash",
+   "attack1": "Punch_Cross",
+   "attack2": "Melee_Hook+Melee_Hook_Rec",
+   "attack3": "Sword_Attack_Standing",
+   "heavy": "Sword_Heavy_Combo@52-100",
+   "hit1": "Hit_Chest",
+   "hit2": "Hit_Shoulder_L",
+   "hit3": "Hit_Stomach",
+   "death": "Death01",
+   "win": "Celebration",
+   "note": "attack1 drill thrust, attack2 low lunging hook (UAL2 strike + its recovery joined), attack3 overhead chop, heavy = the last blow of the heavy combo (drill driven into the ground). Sources: UAL1.glb,UAL2_Standard.glb; A+B and @from-to are tools/retarget.py syntax."
+  },
+  "eyes": {
+   "front": [
+    [
+     385,
+     268,
+     34
+    ],
+    [
+     340,
+     328,
+     30
+    ],
+    [
+     430,
+     328,
+     30
+    ]
+   ],
+   "color": [
+    1.0,
+    0.32,
+    0.04
+   ],
+   "disc_strength": 0.45,
+   "disc_scale": 0.9,
+   "note": "picks on tools/find-lenses.py render"
+  },
+  "span": 1.8,
+  "span_note": "span 1.8 (default 1.35): the lunging hook and the raised drill were cut off by the frame edge. frame 342 keeps the same pixels per metre as 256 @ 1.35. Pack with --size 316 (same pixel density as the old --size 224 sheet; the crop box is wider now)."
+ },
+ "drone": {
+  "elev": 12,
+  "frame": 256,
+  "hover": {
+   "yaw": 145,
+   "length_m": 2.2,
+   "hover_m": 0.75,
+   "rotor_z": 0.81,
+   "rotor_z_outer": 0.74,
+   "side_axis": 1,
+   "spin_deg": 47,
+   "ref_h": 2.6,
+   "note": "tools/bake-hover.py: no rig, procedural flight; nose is model -X",
+   "eyes3d": [
+    [
+     -0.4229,
+     0.0131,
+     0.0952,
+     0.0226
+    ],
+    [
+     -0.4188,
+     -0.0188,
+     0.051,
+     0.0185
+    ],
+    [
+     -0.4195,
+     0.0192,
+     0.015,
+     0.0206
+    ]
+   ]
+  },
+  "clips": [
+   [
+    "idle",
+    8,
+    true
+   ],
+   [
+    "fly",
+    8,
+    true
+   ],
+   [
+    "shoot",
+    6,
+    false
+   ],
+   [
+    "hit",
+    4,
+    false
+   ],
+   [
+    "death",
+    10,
+    false
+   ],
+   [
+    "win",
+    10,
+    false
+   ]
+  ],
+  "fps": {
+   "idle": 12,
+   "fly": 14,
+   "shoot": 14,
+   "hit": 12,
+   "death": 12,
+   "win": 12
+  },
+  "eyes": {
+   "color": [
+    1.0,
+    0.32,
+    0.04
+   ],
+   "disc_strength": 0.45,
+   "disc_scale": 0.95
+  }
+ },
+ "sniper": {
+  "yaw": 55,
+  "elev": 12,
+  "retarget": {
+   "align": "arms",
+   "arm_spread": 6,
+   "arm_forward": 0
+  },
+  "span": 1.6,
+  "frame": 304,
+  "props": [
+   {
+    "file": "~/degenWars/assets/props/railrifle.glb",
+    "bone": "RightHand",
+    "from": "RightForeArm",
+    "parent": "RightForeArm",
+    "pose": "idle",
+    "length": 0.42,
+    "forward": 0.3,
+    "roll": 0,
+    "flip": 1
+   }
+  ],
+  "clipmap": {
+   "idle": "Idle_Loop",
+   "walk": "Walk_Loop",
+   "aim": "Pistol_Aim_Neutral",
+   "shoot": "Pistol_Shoot",
+   "reload": "Pistol_Reload",
+   "hit1": "Hit_Chest",
+   "hit2": "Hit_Shoulder_R",
+   "death": "Death01",
+   "win": "Celebration"
+  },
+  "clips": [
+   [
+    "idle",
+    8,
+    true
+   ],
+   [
+    "walk",
+    10,
+    true
+   ],
+   [
+    "aim",
+    6,
+    true
+   ],
+   [
+    "shoot",
+    6,
+    false
+   ],
+   [
+    "reload",
+    10,
+    false
+   ],
+   [
+    "hit1",
+    4,
+    false
+   ],
+   [
+    "hit2",
+    5,
+    false
+   ],
+   [
+    "death",
+    8,
+    false
+   ],
+   [
+    "win",
+    8,
+    false
+   ]
+  ],
+  "fps": {
+   "idle": 8,
+   "walk": 12,
+   "aim": 6,
+   "shoot": 14,
+   "reload": 12,
+   "hit1": 12,
+   "hit2": 12,
+   "death": 10,
+   "win": 8
+  },
+  "eyes": {
+   "front": [
+    [
+     360,
+     190,
+     28
+    ],
+    [
+     330,
+     265,
+     30
+    ],
+    [
+     420,
+     240,
+     28
+    ]
+   ],
+   "color": [
+    1.0,
+    0.32,
+    0.04
+   ],
+   "disc_strength": 0.45,
+   "disc_scale": 0.9,
+   "note": "picks on tools/find-lenses.py render"
+  }
+ },
+ "lancer": {
+  "yaw": 55,
+  "elev": 12,
+  "retarget": {
+   "align": "arms",
+   "arm_spread": 6,
+   "arm_forward": 0
+  },
+  "span": 1.6,
+  "frame": 304,
+  "props": [
+   {
+    "file": "~/degenWars/assets/props/pike.glb",
+    "bone": "LeftHand",
+    "from": "LeftForeArm",
+    "parent": "LeftHand",
+    "pose": "idle",
+    "length": 0.8,
+    "forward": 0.0,
+    "roll": 0,
+    "flip": 1
+   },
+   {
+    "file": "~/degenWars/assets/props/shield.glb",
+    "bone": "RightHand",
+    "from": "RightForeArm",
+    "parent": "RightForeArm",
+    "pose": "idle",
+    "length": 0.55,
+    "forward": -0.45,
+    "roll": 180,
+    "flip": 1,
+    "note": "shield on the camera-side arm so the shield wall reads in every pose"
+   }
+  ],
+  "clipmap": {
+   "idle": "Idle_Loop",
+   "walk": "Walk_Loop",
+   "attack1": "Punch_Jab",
+   "attack2": "Push_Enter",
+   "hit1": "Hit_Chest",
+   "hit2": "Hit_Stomach",
+   "death": "Death01",
+   "win": "Celebration"
+  },
+  "clips": [
+   [
+    "idle",
+    8,
+    true
+   ],
+   [
+    "walk",
+    10,
+    true
+   ],
+   [
+    "attack1",
+    6,
+    false
+   ],
+   [
+    "attack2",
+    8,
+    false
+   ],
+   [
+    "hit1",
+    4,
+    false
+   ],
+   [
+    "hit2",
+    6,
+    false
+   ],
+   [
+    "death",
+    8,
+    false
+   ],
+   [
+    "win",
+    8,
+    false
+   ]
+  ],
+  "fps": {
+   "idle": 8,
+   "walk": 11,
+   "attack1": 14,
+   "attack2": 12,
+   "hit1": 12,
+   "hit2": 12,
+   "death": 10,
+   "win": 8
+  },
+  "eyes": {
+   "front": [
+    [
+     340,
+     385,
+     20
+    ],
+    [
+     402,
+     385,
+     20
+    ],
+    [
+     370,
+     445,
+     22
+    ]
+   ],
+   "color": [
+    1.0,
+    0.32,
+    0.04
+   ],
+   "disc_strength": 0.45,
+   "disc_scale": 0.9,
+   "note": "picks on tools/find-lenses.py render"
+  }
+ },
+ "commander": {
+  "yaw": 55,
+  "elev": 12,
+  "retarget": {
+   "align": "arms",
+   "arm_spread": 6,
+   "arm_forward": 0
+  },
+  "span": 1.7,
+  "frame": 322,
+  "props": [
+   {
+    "file": "~/degenWars/assets/props/sword.glb",
+    "bone": "RightHand",
+    "from": "RightForeArm",
+    "parent": "RightHand",
+    "pose": "idle",
+    "length": 0.42,
+    "forward": 0.55,
+    "roll": 0,
+    "flip": 1
+   }
+  ],
+  "clipmap": {
+   "idle": "Idle_Loop",
+   "walk": "Walk_Formal_Loop",
+   "attack1": "Sword_Attack_Standing",
+   "attack2": "Melee_Hook+Melee_Hook_Rec",
+   "heavy": "Sword_Heavy_Combo@52-100",
+   "rally": "Idle_Rail_Call",
+   "hit1": "Hit_Chest",
+   "hit2": "Hit_Shoulder_L",
+   "death": "Death02",
+   "win": "Celebration"
+  },
+  "clips": [
+   [
+    "idle",
+    8,
+    true
+   ],
+   [
+    "walk",
+    10,
+    true
+   ],
+   [
+    "attack1",
+    10,
+    false
+   ],
+   [
+    "attack2",
+    8,
+    false
+   ],
+   [
+    "heavy",
+    12,
+    false
+   ],
+   [
+    "rally",
+    10,
+    false
+   ],
+   [
+    "hit1",
+    4,
+    false
+   ],
+   [
+    "hit2",
+    5,
+    false
+   ],
+   [
+    "death",
+    8,
+    false
+   ],
+   [
+    "win",
+    8,
+    false
+   ]
+  ],
+  "fps": {
+   "idle": 8,
+   "walk": 10,
+   "attack1": 14,
+   "attack2": 14,
+   "heavy": 12,
+   "rally": 10,
+   "hit1": 12,
+   "hit2": 12,
+   "death": 10,
+   "win": 8
+  },
+  "eyes": {
+   "front": [
+    [
+     355,
+     365,
+     22
+    ],
+    [
+     405,
+     430,
+     18
+    ],
+    [
+     360,
+     460,
+     18
+    ]
+   ],
+   "color": [
+    1.0,
+    0.32,
+    0.04
+   ],
+   "disc_strength": 0.45,
+   "disc_scale": 0.9,
+   "note": "picks on tools/find-lenses.py render"
+  }
+ },
+ "hacker": {
+  "yaw": 55,
+  "elev": 12,
+  "retarget": {
+   "align": "arms",
+   "arm_spread": 10,
+   "arm_forward": 0
+  },
+  "span": 1.5,
+  "frame": 288,
+  "clipmap": {
+   "idle": "Idle_Loop",
+   "walk": "Walk_Loop",
+   "deploy": "Spell_Simple_Shoot",
+   "hack": "Spell_Double_Shoot_Loop",
+   "hit1": "Hit_Chest",
+   "hit2": "Hit_Stomach",
+   "death": "Death01",
+   "win": "Celebration"
+  },
+  "clips": [
+   [
+    "idle",
+    8,
+    true
+   ],
+   [
+    "walk",
+    10,
+    true
+   ],
+   [
+    "deploy",
+    8,
+    false
+   ],
+   [
+    "hack",
+    8,
+    true
+   ],
+   [
+    "hit1",
+    4,
+    false
+   ],
+   [
+    "hit2",
+    6,
+    false
+   ],
+   [
+    "death",
+    8,
+    false
+   ],
+   [
+    "win",
+    8,
+    false
+   ]
+  ],
+  "fps": {
+   "idle": 8,
+   "walk": 12,
+   "deploy": 14,
+   "hack": 12,
+   "hit1": 12,
+   "hit2": 12,
+   "death": 10,
+   "win": 8
+  },
+  "eyes": {
+   "front": [
+    [
+     378,
+     522,
+     55
+    ],
+    [
+     190,
+     627,
+     55
+    ],
+    [
+     570,
+     627,
+     55
+    ]
+   ],
+   "color": [
+    1.0,
+    0.32,
+    0.04
+   ],
+   "disc_strength": 0.45,
+   "disc_scale": 0.85,
+   "note": "picks on tools/find-lenses.py render"
+  }
+ },
+ "orb": {
+  "elev": 12,
+  "frame": 256,
+  "hover": {
+   "yaw": 55,
+   "nose": [
+    0,
+    -1,
+    0
+   ],
+   "length_m": 0.6,
+   "hover_m": 1.6,
+   "rotors": false,
+   "ref_h": 2.6,
+   "eyes3d": [
+    [
+     -0.0763,
+     -0.4275,
+     0.0267,
+     0.0364
+    ],
+    [
+     0.0278,
+     -0.4286,
+     0.0267,
+     0.0364
+    ],
+    [
+     -0.0242,
+     -0.4285,
+     -0.0553,
+     0.0391
+    ]
+   ],
+   "tints": {
+    "scout": {
+     "hue": 0.5,
+     "sat": 1.0,
+     "lens": [
+      1.0,
+      0.32,
+      0.04
+     ]
+    },
+    "mark": {
+     "hue": 0.93,
+     "sat": 1.7,
+     "lens": [
+      1.0,
+      0.08,
+      0.03
+     ]
+    },
+    "jam": {
+     "hue": 0.03,
+     "sat": 1.9,
+     "val": 1.1,
+     "lens": [
+      1.0,
+      0.62,
+      0.05
+     ]
+    },
+    "patch": {
+     "hue": 0.1,
+     "sat": 1.4,
+     "lens": [
+      0.35,
+      0.9,
+      0.2
+     ]
+    }
+   },
+   "note": "tools/bake-hover.py --tint <role>; Meshy front is -Y so yaw 55 like the mechs"
+  },
+  "eyes": {
+   "disc_strength": 0.5,
+   "disc_scale": 0.95
+  },
+  "clips": [
+   [
+    "idle",
+    8,
+    true
+   ],
+   [
+    "fly",
+    8,
+    true
+   ],
+   [
+    "shoot",
+    6,
+    false
+   ],
+   [
+    "hit",
+    4,
+    false
+   ],
+   [
+    "death",
+    10,
+    false
+   ],
+   [
+    "win",
+    10,
+    false
+   ]
+  ],
+  "fps": {
+   "idle": 10,
+   "fly": 12,
+   "shoot": 14,
+   "hit": 12,
+   "death": 12,
+   "win": 12
+  }
+ }
+}

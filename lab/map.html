@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>War Table · degenWars lab</title>
+<meta name="description" content="degenWars War Table: seeded world map generator and board-game sandbox.">
+<link rel="stylesheet" href="map.css">
+</head>
+<body>
+<header id="bar">
+  <div class="brand"><b>WAR TABLE</b><span id="sea">SEASON · <i id="seedLbl">—</i></span></div>
+  <div id="track"><span id="rnd">ROUND 1/84</span><span class="sep">·</span><span id="tick">tick in --:--</span><span class="sep">·</span><span id="next">NEXT CARD —</span></div>
+  <div id="obt" title="Outbreak track: at 8, The Long Night"></div>
+</header>
+<main id="stage">
+  <canvas id="cv"></canvas>
+  <div id="zoom"><button data-z="in" aria-label="Zoom in">+</button><button data-z="out" aria-label="Zoom out">−</button><button data-z="fit" aria-label="Fit board">⊡</button></div>
+  <div id="lvl">STRATEGIC</div>
+  <div id="toast"></div>
+</main>
+<aside id="panel" class="open">
+  <nav id="tabs">
+    <button data-t="tile">Tile</button><button data-t="sand" class="on">Sandbox</button><button data-t="fac">Factions</button><button data-t="gen">Map</button><button id="sheet" aria-label="Toggle panel">▾</button>
+  </nav>
+  <section id="p-tile" class="pane"><div class="empty">Tap a hex to read its tile card.</div></section>
+  <section id="p-sand" class="pane on"></section>
+  <section id="p-fac" class="pane"></section>
+  <section id="p-gen" class="pane"></section>
+</aside>
+<script type="module" src="map.js"></script>
+</body>
+</html>

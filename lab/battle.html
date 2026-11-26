@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>degenWars · Phaser battlefield lab</title>
+<style>
+:root{--bg:#211e1b;--ink:#ddd9ce;--mute:#a58f70;--line:#5c4838}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:15px/1.4 system-ui,sans-serif}
+.wrap{display:flex;flex-direction:column;height:100%;padding:10px max(10px,env(safe-area-inset-left)) max(10px,env(safe-area-inset-bottom))}
+header{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px}
+header b{font-size:18px;margin-right:auto}
+button{background:#30312f;color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:8px 12px;min-height:40px;font:600 14px system-ui;cursor:pointer}
+button.on{border-color:#af9561;color:#af9561}
+#game{flex:1;min-height:0;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+p{color:var(--mute);margin:6px 0 0;font-size:13px}
+</style></head>
+<body><div class="wrap">
+<header><b>Battlefield lab · Phaser 2.5D</b>
+  <span id="clips"></span>
+  <button id="paint" class="on">Painted</button><button id="march">March in</button>
+</header>
+<div id="game"></div>
+<p>Soldier v1 "Grunt": Meshy model → UAL animations → baked in Blender (side 3/4 view, DKC-style) → painterly pass → Phaser sprite sheet. Enemies will be mirrored copies of the same pipeline.</p>
+</div>
+<script src="../vendor/phaser-3.90.0.min.js"></script>
+<script>
+{
+const UNIT='soldier', BASE='../assets/units/'+UNIT+'/';
+let SHEET=null, painted=true, scene=null;
+const W=1600, H=900, GROUND=0.80;   // logical size; Phaser scales it to fit
+
+class Field extends Phaser.Scene{
+  constructor(){super('field')}
+  preload(){
+    this.load.image('field','../art/field.webp');
+    this.load.spritesheet('u-painted',BASE+"sheet.webp?t="+Date.now(),{frameWidth:SHEET.frameWidth,frameHeight:SHEET.frameHeight});
+    this.load.spritesheet('u-raw',BASE+"sheet-raw.webp?t="+Date.now(),{frameWidth:SHEET.frameWidth,frameHeight:SHEET.frameHeight});
+  }
+  create(){
+    scene=this;
+    const bg=this.add.image(W/2,H/2,'field');bg.setScale(Math.max(W/bg.width,H/bg.height));
+    for(const key of ['u-painted','u-raw'])for(const [name,c] of Object.entries(SHEET.clips)){
+      this.anims.create({key:key+':'+name,frames:this.anims.generateFrameNumbers(key,{start:c.row*SHEET.cols,end:c.row*SHEET.cols+c.n-1}),frameRate:c.fps,repeat:c.loop?-1:0});
+    }
+    this.squad=[];
+    const slots=[[0.30,0.80],[0.22,0.86],[0.38,0.88],[0.14,0.82],[0.26,0.93]];
+    slots.forEach(([x,y],i)=>{
+      const s=this.add.sprite(-120-i*90,H*y,'u-painted').setOrigin(SHEET.foot[0],SHEET.foot[1]);
+      const k=H*0.30/SHEET.frameHeight*(0.85+y*0.2);   // a little bigger closer to the camera
+      s.setScale(k); s.setDepth(y*1000); s.homeX=W*x; s.i=i; this.squad.push(s);
+      // contact shadow: a soft dark ellipse that follows the feet
+      s.shadow=this.add.ellipse(s.x,s.y,SHEET.frameWidth*k*0.62,SHEET.frameHeight*k*0.07,0x211e1b,0.55).setDepth(y*1000-1);
+    });
+    this.march();
+  }
+  update(){if(this.squad)this.squad.forEach(s=>{s.shadow.x=s.x;s.shadow.y=s.y-2;s.shadow.visible=!(s.anims.currentAnim&&s.anims.currentAnim.key.endsWith(':death')&&s.anims.currentFrame&&s.anims.currentFrame.index>4)})}
+  key(){return painted?'u-painted':'u-raw'}
+  play(s,clip){s.setTexture(this.key());s.play(this.key()+':'+clip,true)}
+  march(){
+    this.squad.forEach(s=>{
+      this.tweens.killTweensOf(s); s.x=-120-s.i*90; this.play(s,'walk');
+      this.tweens.add({targets:s,x:s.homeX,duration:2600+s.i*250,ease:'Linear',onComplete:()=>this.fire(s)});
+    });
+  }
+  fire(s){
+    this.play(s,'shoot');
+    s.once('animationcomplete',()=>{this.flash(s);this.time.delayedCall(300+Math.random()*700,()=>{if(s.anims.currentAnim&&s.anims.currentAnim.key.endsWith(':shoot'))this.fire(s)})});
+  }
+  flash(s){   // muzzle flash + tracer at the forearm cannon, in warning orange
+    const mx=s.x+s.displayWidth*0.42, my=s.y-s.displayHeight*0.52;
+    const f=this.add.circle(mx,my,10,0xf0a040,0.9).setDepth(s.depth+1).setBlendMode('ADD');
+    this.tweens.add({targets:f,scale:2.2,alpha:0,duration:120,onComplete:()=>f.destroy()});
+    const t=this.add.line(0,0,mx,my,mx+260+Math.random()*200,my+Math.random()*30-15,0xffc070,0.7).setOrigin(0).setLineWidth(2).setDepth(s.depth+1);
+    this.tweens.add({targets:t,alpha:0,duration:140,onComplete:()=>t.destroy()});
+  }
+}
+
+fetch(BASE+'sheet.json',{cache:'no-cache'}).then(r=>r.json()).then(j=>{
+  SHEET=j;
+  new Phaser.Game({type:Phaser.AUTO,parent:'game',backgroundColor:'#211e1b',scale:{mode:Phaser.Scale.FIT,autoCenter:Phaser.Scale.CENTER_BOTH,width:W,height:H},scene:Field});
+  const box=document.getElementById('clips');
+  box.innerHTML=Object.keys(j.clips).map(c=>`<button data-c="${c}">${c}</button>`).join(' ');
+  box.querySelectorAll('button').forEach(b=>b.onclick=()=>{if(!scene)return;scene.squad.forEach(s=>{scene.tweens.killTweensOf(s);s.x=s.homeX;c=b.dataset.c;c==='shoot'?scene.fire(s):scene.play(s,c)})});
+  let c;
+  document.getElementById('march').onclick=()=>scene&&scene.march();
+  document.getElementById('paint').onclick=e=>{painted=!painted;e.target.classList.toggle('on',painted);e.target.textContent=painted?'Painted':'Raw render';
+    if(scene)scene.squad.forEach(s=>{const k=s.anims.currentAnim&&s.anims.currentAnim.key.split(':')[1]||'idle';scene.play(s,k)})};
+}).catch(e=>{document.getElementById('game').textContent='Could not load the sprite sheet: '+e.message});
+}
+</script>
+</body></html>

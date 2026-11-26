@@ -1,0 +1,52 @@
+/* ===== Codex v2: steel archive cabinet, typed dossier paper. Fonts/tokens come from the page (style-v2) ===== */
+.cx{background:rgba(10,10,9,.86)}
+.cx-in{background:var(--grain),linear-gradient(180deg,#232524,#1a1b1a);border:1px solid var(--line);border-radius:6px;box-shadow:inset 0 0 0 1px #000,0 20px 60px rgba(0,0,0,.6)}
+.cx-top{border-bottom:1px solid var(--rule);background:var(--grain),linear-gradient(180deg,#2e3131,#232626)}
+.cx-brand{font-family:var(--f-disp);font-size:24px;color:var(--ink);letter-spacing:.14em;text-transform:uppercase}
+.cx-brand span{font-family:var(--f-mono);font-size:12px;color:var(--mute);letter-spacing:.04em;text-transform:none}
+.cx-x{border-radius:4px;background:linear-gradient(180deg,#56605f,#3f4748 55%,#353c3d);border:1px solid #66706f;color:var(--ink)}
+.cx-cats{border-right:1px solid var(--rule)}
+.cx-cat,.cx-item{border-radius:4px;color:var(--ink);font-family:var(--f-ui)}
+.cx-cat b,.cx-item b{font-weight:700;font-size:16px;letter-spacing:.03em}
+.cx-cat small,.cx-item small{color:var(--mute);font-size:13px}
+.cx-cat small i{color:#d9772b}
+.cx-cat:hover,.cx-item:hover{background:#2a2c2b}
+.cx-cat.on,.cx-item.on{background:#323736;border-color:var(--ink2);box-shadow:inset 3px 0 0 var(--ochre)}
+.cx-list{border-right:1px solid var(--rule)}
+.cx-list h3{font-family:var(--f-ui);font-weight:700;font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--label);padding-bottom:6px;border-bottom:1px solid var(--rule)}
+.cx-item em{font-family:var(--f-ui);font-weight:700;letter-spacing:.16em;color:#d9675a;border-color:#a8402e;border-radius:2px}
+.cx-item.locked b{color:#6f716b}
+.cx-item.new::before{border-radius:0;background:#d9772b}
+.cx-doc{color:#d6d2c6;font:400 14.5px/1.72 var(--f-mono)}
+.cx-doc h2{font-family:var(--f-disp);font-weight:400;letter-spacing:.06em;color:var(--bone);text-transform:uppercase}
+.cx-sub{color:var(--label);font-family:var(--f-ui);font-weight:600;font-size:16px;letter-spacing:.04em}
+.cx-plate{border-radius:4px;border:1px solid var(--line)}
+.cx-plate.none::after{font:600 12px var(--f-mono);letter-spacing:.2em;background:rgba(20,20,19,.6)}
+.cx-plate-k{font:600 11px var(--f-mono);letter-spacing:.12em;border-radius:2px;color:var(--ink2);background:rgba(16,17,16,.8)}
+.cx-head{font-family:var(--f-mono);font-size:12px;color:var(--mute)}
+.cx-class{font:400 13px var(--f-disp);letter-spacing:.18em;color:#c0392b;border-color:#b3261e;border-radius:2px}
+.cx-stats{font-family:var(--f-mono);font-size:13px}
+.cx-stats th{color:var(--label);font-family:var(--f-ui);font-weight:700;letter-spacing:.12em;text-transform:uppercase;font-size:12px;border-bottom:1px solid var(--rule)}
+.cx-stats td{color:var(--ink);border-bottom:1px solid var(--rule)}
+.cx-notes{border-radius:2px;background:var(--grain),linear-gradient(180deg,#d8cfb6,#c9bfa2);border:0;border-left:3px solid #864F3B;color:#2a2621;font:500 14px/1.6 var(--f-mono);box-shadow:0 4px 12px rgba(0,0,0,.4)}
+.cx-notes b{font-family:var(--f-ui);font-weight:700;letter-spacing:.2em;color:#864F3B}
+.cx-narr{color:#8d8f88;font-family:var(--f-mono)}
+.cx-empty{color:var(--mute);font-family:var(--f-mono)}
+.cx-seal{font-family:var(--f-disp);color:#b3261e;border:3px solid #b3261e;border-radius:2px;letter-spacing:.1em}
+.cx-sealed p{color:var(--mute);font-family:var(--f-mono)}
+.cx-back{font:700 14px var(--f-ui);letter-spacing:.1em;text-transform:uppercase;border-radius:4px;background:linear-gradient(180deg,#56605f,#3f4748 55%,#353c3d);border:1px solid #66706f;color:var(--ink)}
+/* NEW DOSSIER: an ivory field slip with a cadmium rubber stamp */
+.cx-stamp{background:var(--grain),linear-gradient(180deg,#dfd6bf,#cfc4a6);color:#211E1B;border:1px solid #8f8466;border-radius:2px;box-shadow:inset 0 0 18px rgba(92,72,56,.25),0 10px 30px rgba(0,0,0,.55)}
+.cx-stamp-k{font:400 12px var(--f-disp);letter-spacing:.2em;color:#B3261E;border:2px solid #B3261E;border-radius:1px;padding:1px 6px 0;transform:rotate(-2deg)}
+.cx-stamp b{font:400 19px var(--f-disp);letter-spacing:.06em;text-transform:uppercase}
+.cx-stamp small{font:500 11px var(--f-mono);color:#5c4838;letter-spacing:.02em}
+.cx-open [data-codex-badge]{background:#B3261E;color:#f6efe2;font:700 12px/20px var(--f-num,sans-serif);border-radius:2px}
+.cx-cats,.cx-list,.cx-doc{scrollbar-color:#4a5251 #1a1b1a;scrollbar-width:thin}
+/* ===== Codex art layer (painted textures from art/ui-*.webp, see docs/style.md "Art") ===== */
+.cx-in{background:linear-gradient(180deg,rgba(32,34,33,.62),rgba(20,21,20,.80)),url(art/ui-steel.webp) center/cover,#1f2120}
+.cx-top{background:linear-gradient(180deg,rgba(44,47,47,.50),rgba(30,32,32,.72)),url(art/ui-steel.webp) center/cover,#2b2e2e}
+.cx-x,.cx-back{background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(0,0,0,.22)),url(art/ui-btn-steel.webp) center/100% 100% no-repeat,#485354}
+.cx-x:hover,.cx-back:hover{filter:brightness(1.12)}
+.cx-notes{background:linear-gradient(180deg,rgba(236,228,206,.16),rgba(160,140,100,.10)),url(art/ui-paper.webp) center/cover,#d4c9ad}
+.cx-stamp{background:linear-gradient(180deg,rgba(236,228,206,.20),rgba(160,140,100,.08)),url(art/ui-paper.webp) center/cover,#dfd6bf}
+.cx-open [data-codex-badge]{background:linear-gradient(rgba(255,220,200,.06),rgba(40,4,2,.2)),url(art/ui-btn-red.webp) center/100% 100%,#B3261E}

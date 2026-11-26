@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>degenWars · ground calibration</title>
+<style>
+:root{--ivory:#D4C9AD;--ochre:#AF9561;--oxide:#864F3B;--carbon:#211E1B;--gold:#C9A23A}
+*{box-sizing:border-box}html,body{margin:0;height:100%;overflow-x:hidden;background:#15110d;color:var(--ivory);font:14px/1.4 system-ui,sans-serif}
+.top{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:10px 14px;border-bottom:1px solid #4d3c29;background:#1d1813}
+.top h1{font-size:16px;margin:0 8px 0 0;color:#e8d3a8}
+button{font:600 13px system-ui;padding:8px 12px;border-radius:8px;border:1px solid #7a5a34;background:#2e241a;color:var(--ivory);cursor:pointer}
+button.on{border-color:var(--gold);color:#f0c870;background:#3e2e1c}button.save{background:linear-gradient(#d9b25a,#9a7426);color:#1a120a;border-color:#e8c878}
+label{display:flex;gap:8px;align-items:center}input[type=range]{width:180px}
+.help{padding:6px 14px;color:#b8a888;font-size:13px}.help b{color:#f0dcb0}
+#stage{position:relative;margin:0 auto;touch-action:none;user-select:none}
+#img{position:absolute;display:block}
+#cv{position:absolute;left:0;top:0;pointer-events:none}
+.h{position:absolute;width:26px;height:26px;margin:-13px 0 0 -13px;border-radius:50%;background:rgba(201,162,58,.35);border:2px solid #ffd98a;box-shadow:0 0 0 2px #000,0 0 10px rgba(255,200,90,.7);cursor:grab;touch-action:none}
+.h.hz{width:22px;height:22px;margin:-11px 0 0 -11px;background:rgba(140,200,255,.35);border-color:#a8d8ff;cursor:ns-resize}
+.h span{position:absolute;left:30px;top:2px;white-space:nowrap;font-size:11px;font-weight:700;color:#ffe2a6;text-shadow:0 1px 2px #000}
+.ref{position:absolute;background-repeat:no-repeat;pointer-events:none;filter:drop-shadow(0 0 1px #000)}
+#status{margin-left:auto;font-weight:700}
+</style></head><body>
+<div class="top"><h1>Ground calibration</h1>
+ <button data-k="field" class="on">Desktop painting</button><button data-k="tall">Phone painting</button>
+ <label>Grunt height at the near edge <input id="nearH" type="range" min="0.04" max="0.5" step="0.005"><b id="nearV"></b></label>
+ <span>Far units: <b id="farV"></b></span><button id="reset">Reset to default</button><button class="save" id="save">Save</button><span id="status"></span></div>
+<div class="help">Drag the 4 gold handles onto the painting's ground: the <b>far</b> pair sits where the walkable ground ends near the horizon, the <b>near</b> pair at the bottom (they may go past the picture edges to match the perspective). Grid lines should run along the ground like floor tiles. Then set the slider so the front Grunt looks the right size. The blue dashed <b>horizon</b> line sets how fast units shrink with distance (true perspective: put it on the painting's horizon; lower = stronger shrink). The dashed line is the deploy line.</div>
+<div id="stage"><img id="img" alt=""><canvas id="cv"></canvas></div>
+<script src="../ground.js"></script>
+<script>
+(async()=>{
+ await Ground.ready;
+ const sheet=await fetch('../assets/units/soldier/sheet-v2.json').then(r=>r.json()).catch(()=>null);
+ let key='field',dirty=false;const st=document.getElementById('stage'),img=document.getElementById('img'),cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+ const names=['far left','far right','near right','near left'];const hs=names.map((n,i)=>{const d=document.createElement('div');d.className='h';d.innerHTML=`<span>${n}</span>`;st.appendChild(d);d.dataset.i=i;return d});
+ const hz=document.createElement('div');hz.className='h hz';hz.dataset.i='hz';hz.innerHTML='<span>horizon (drag up/down)</span>';st.appendChild(hz);
+ const REFS=[[.15,1],[.5,1],[.85,1],[.3,.55],[.7,.55],[.2,.08],[.5,.08],[.8,.08]];
+ const refs=REFS.map(()=>{const d=document.createElement('div');d.className='ref';st.appendChild(d);return d});
+ let box={};
+ function layout(){const c=Ground.C[key],px=key==='tall'?.75:.45,py=.1,availW=innerWidth-28,availH=innerHeight-st.getBoundingClientRect().top-12;
+  const s=Math.min(availW/(c.iw*(1+2*px)),availH/(c.ih*(1+2*py)));const w=c.iw*s,h=c.ih*s,ox=w*px,oy=h*py;
+  box={w,h,ox,oy};st.style.width=(w+2*ox)+'px';st.style.height=(h+2*oy)+'px';
+  img.src='../'+c.img;Object.assign(img.style,{left:ox+'px',top:oy+'px',width:w+'px',height:h+'px'});cv.width=w+2*ox;cv.height=h+2*oy;draw()}
+ function draw(){const c=Ground.C[key],{w,h,ox,oy}=box;document.getElementById('nearH').value=c.nearH;document.getElementById('nearV').textContent=(c.nearH*100).toFixed(1)+'% of picture';
+  c.quad.forEach(([u,v],i)=>{hs[i].style.left=(ox+u*w)+'px';hs[i].style.top=(oy+v*h)+'px'});
+  const F=Ground.frame(key,w,h),P=(a,b)=>{const [x,y]=F.toScreen(a,b);return [x+ox,y+oy]};
+  hz.style.left=(ox+18)+'px';hz.style.top=(F.horizon+oy)+'px';
+  document.getElementById('farV').textContent=Math.round(F.farScale*100)+'% of near';
+  ctx.clearRect(0,0,cv.width,cv.height);
+  ctx.setLineDash([4,6]);ctx.lineWidth=1.5;ctx.strokeStyle='rgba(140,200,255,.8)';ctx.beginPath();ctx.moveTo(0,F.horizon+oy);ctx.lineTo(cv.width,F.horizon+oy);ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle='rgba(201,162,58,.10)';ctx.beginPath();[[0,0],[1,0],[1,1],[0,1]].forEach(([a,b],k)=>{const p=P(a,b);k?ctx.lineTo(...p):ctx.moveTo(...p)});ctx.closePath();ctx.fill();
+  ctx.lineWidth=1;ctx.strokeStyle='rgba(255,226,166,.55)';
+  for(let i=0;i<=10;i++){const a=i/10;ctx.beginPath();ctx.moveTo(...P(a,0));for(let k=1;k<=20;k++)ctx.lineTo(...P(a,k/20));ctx.stroke()}
+  for(let j=0;j<=8;j++){const b=j/8;ctx.beginPath();ctx.moveTo(...P(0,b));ctx.lineTo(...P(1,b));ctx.stroke()}
+  ctx.lineWidth=2.5;ctx.strokeStyle='#ffd98a';ctx.beginPath();[[0,0],[1,0],[1,1],[0,1],[0,0]].forEach(([a,b],k)=>{const p=P(a,b);k?ctx.lineTo(...p):ctx.moveTo(...p)});ctx.stroke();
+  ctx.setLineDash([8,6]);ctx.strokeStyle='#ff9a5a';ctx.beginPath();ctx.moveTo(...P(.45,0));ctx.lineTo(...P(.45,1));ctx.stroke();ctx.setLineDash([]);
+  if(!sheet)return;const fw=sheet.frameWidth,fh=sheet.frameHeight,rows=1+Math.max(...Object.values(sheet.clips).map(c=>c.row)),r=sheet.clips.idle.row;
+  REFS.forEach(([a,b],i)=>{const d=refs[i],[x,y]=P(a,b),hpx=fh/sheet.ppm*F.pxPerM(b),wpx=hpx*fw/fh;
+   Object.assign(d.style,{width:wpx+'px',height:hpx+'px',left:(x-sheet.foot[0]*wpx)+'px',top:(y-sheet.foot[1]*hpx)+'px',zIndex:Math.round(b*100),
+    backgroundImage:'url(../assets/units/soldier/sheet-v2.webp)',backgroundSize:`${sheet.cols*100}% ${rows*100}%`,backgroundPosition:`0% ${rows>1?r/(rows-1)*100:0}%`})})}
+ let drag=null;
+ st.addEventListener('pointerdown',e=>{const h=e.target.closest('.h');if(!h)return;drag=h.dataset.i==='hz'?'hz':+h.dataset.i;h.setPointerCapture(e.pointerId);e.preventDefault()});
+ st.addEventListener('pointermove',e=>{if(drag==null)return;const r=st.getBoundingClientRect(),{w,h,ox,oy}=box;
+  if(drag==='hz')Ground.C[key].horizon=+((e.clientY-r.top-oy)/h).toFixed(4);
+  else Ground.C[key].quad[drag]=[+((e.clientX-r.left-ox)/w).toFixed(4),+((e.clientY-r.top-oy)/h).toFixed(4)];dirty=true;msg('unsaved','#ffb36a');draw()});
+ st.addEventListener('pointerup',()=>drag=null);st.addEventListener('pointercancel',()=>drag=null);
+ document.getElementById('nearH').oninput=e=>{Ground.C[key].nearH=+e.target.value;dirty=true;msg('unsaved','#ffb36a');draw()};
+ document.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{key=b.dataset.k;document.querySelectorAll('[data-k]').forEach(x=>x.classList.toggle('on',x===b));layout()});
+ document.getElementById('reset').onclick=()=>{Ground.C[key].quad=JSON.parse(JSON.stringify(Ground.DEF[key].quad));Ground.C[key].nearH=Ground.DEF[key].nearH;delete Ground.C[key].horizon;dirty=true;msg('unsaved','#ffb36a');draw()};
+ const msg=(t,c)=>{const s=document.getElementById('status');s.textContent=t;s.style.color=c};
+ document.getElementById('save').onclick=async()=>{const out={};for(const k of ['field','tall'])out[k]={quad:Ground.C[k].quad,nearH:Ground.C[k].nearH,horizon:+Ground.horizonOf(Ground.C[k]).toFixed(4)};
+  try{const r=await fetch('/api/ground',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(out)});if(!r.ok)throw new Error(r.status);dirty=false;msg('saved ✓ (both paintings)','#9be07a')}
+  catch(e){msg('save failed: '+e.message,'#ff6b6b')}};
+ addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue=''}});
+ addEventListener('resize',layout);layout();
+})();
+</script></body></html>

@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0e0b08">
+<title>degenWars Slot Lab</title>
+<link href="https://fonts.googleapis.com/css2?family=Russo+One&family=Limelight&family=Special+Elite&family=Saira+Stencil+One&family=Chakra+Petch:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="slot.css">
+</head>
+<body>
+<div class="stage" id="stage">
+ <header class="hud" id="hud">
+  <div class="title">degen<b>Wars</b><small>slot lab</small></div>
+  <div class="stat" id="turnStat"><i>TURN</i><b id="turn">1</b></div>
+  <div class="stat energy" id="energyStat"><i>ENERGY</i><b id="energy">48</b><span class="ebar"><i id="ebar"></i><i id="ecost"></i></span></div>
+  <div class="army" id="army"><span class="alabel">ARMY <b id="acount">0/8</b></span><div class="aslots" id="aslots"></div></div>
+ </header>
+
+ <main class="machine" id="cab">
+  <div class="marquee"><div class="mq-in"><div class="mq-title">degen<b>Wars</b></div><div class="mq-sub" id="mqsub">Summoner · 8 paylines</div></div></div>
+  <div class="tape" id="tape" title="Each spin is seeded by the live SOL price">
+   <span class="tape-lamp" id="tapeLamp"></span><span class="tape-px" id="tapePx">SOL $--.--</span>
+   <div class="tape-scroll"><div class="tape-track" id="tapeTrack"></div></div>
+  </div>
+  <div class="cabrow">
+   <div class="cabcol">
+    <div class="bezel" id="bezel"><div class="bulbs" id="bulbs"></div>
+     <div class="window" id="window">
+      <div class="reels" id="reels"></div>
+      <svg class="paylines" id="paylines" viewBox="0 0 300 300" preserveAspectRatio="none" aria-hidden="true"></svg>
+      <div class="stamps" id="stamps"></div>
+     </div>
+    </div>
+    <div class="nudges" id="nudges"></div>
+   </div>
+   <div class="leverbay" id="leverbay">
+    <div class="lslot"></div>
+    <button class="lever" id="lever" aria-label="Pull the lever to spin (Space)"><img src="../art/lever.webp" alt="" draggable="false"></button>
+    <span class="lhint" id="lhint">PULL</span>
+   </div>
+  </div>
+  <div class="heat" id="heat"><span class="hlabel">HEAT</span><div class="hseg" id="hseg"></div><span class="chain" id="chain">COLD</span></div>
+  <div class="controls">
+   <button class="spinbtn" id="spin"><span class="sp-t" id="spinT">SPIN</span><small id="spinCost"></small><span class="lamps" id="spinLamps"></span></button>
+   <button class="cbtn" id="blast"><span id="blastT">BLAST</span><small id="blastLeft"></small></button>
+   <button class="cbtn" id="endturn"><span>END TURN</span><small>+25 energy</small></button>
+  </div>
+ </main>
+</div>
+
+<div class="flash" id="flash"></div>
+<canvas id="fx" aria-hidden="true"></canvas>
+
+<button id="dbgBtn" class="dbgbtn" aria-expanded="false" aria-controls="dbg">DEBUG</button>
+<aside id="dbg" class="dbg" hidden>
+ <h4>Force next spin</h4>
+ <div class="dgrid">
+  <button data-force="line1">1 line</button><button data-force="line2">2-line combo</button>
+  <button data-force="combo">Combo ×3+</button><button data-force="near">Near miss</button>
+  <button data-force="full">Full board</button><button data-force="">Random</button>
+ </div>
+ <h4>Rig the gamble</h4>
+ <div class="dgrid">
+  <button data-rig="nudge">Next nudge pays</button><button data-rig="blast">Next blast pays</button>
+ </div>
+ <h4>Resources</h4>
+ <div class="dgrid">
+  <button data-res="energy">+100 energy</button><button data-res="tools">+1 nudge +1 blast</button>
+  <button data-res="spins">Reset spins</button><button data-res="army">Clear army</button>
+ </div>
+ <h4>Rules</h4>
+ <div class="dgrid">
+  <button data-opt="repay">Repay: all standing</button><button data-opt="rm">Reduced motion: off</button>
+ </div>
+ <h4>Cue log <small>(future audio hooks)</small></h4>
+ <ol id="cuelog" class="cuelog"></ol>
+</aside>
+<div id="live" class="sr" aria-live="polite"></div>
+<script src="slot.js"></script>
+</body>
+</html>

@@ -1,0 +1,331 @@
+{
+ "soldier": {
+  "name": "Soldier",
+  "tier": "mech",
+  "role": "Light line mech. The most common summon: cheap, numerous, holds the front line with a rifle.",
+  "variants": {
+   "v1": {
+    "desc": "A compact light infantry mech about three metres tall called the Grunt: a squat cylindrical pressure-vessel torso in faded military olive with a hunched riveted collar, a small cluster of three recessed round optics in a cast-metal head housing, thick hydraulic arms gripping an oversized long-barrelled rifle-autocannon with a drum magazine, short sturdy legs with heavy industrial knee bearings and flat splayed feet. A tattered oxide-red cloth tied to one shoulder and a faded stencil number on the chest.",
+    "png": true,
+    "meshy": true
+   },
+   "v2": {
+    "desc": "A lanky open-frame walker with a weary human pilot visible inside, strapped into an exposed steel roll cage at chest height, the pilot's face lost in shadow under a helmet: tall thin hydraulic legs, a boxy cast-metal powerpack on its back with exhaust stacks, mechanical arms that copy the pilot's arms and hold a heavy rifle with a bayonet. Olive drab paint scraped down to primer, sandbag-like padding on the frame, a small mustard-yellow warning stripe on the leg.",
+    "png": true,
+    "meshy": true
+   },
+   "v3": {
+    "desc": "A stocky trench mech built like farm machinery: a boxy welded hull with a narrow vision slit and two small recessed lenses, a curved riot shield made from a rusted boiler plate on its left arm, a compact rifle-cannon on the right forearm, a stubby antenna, thick pistons on the hips, broad armoured shins caked in mud. Dirty khaki and military olive camouflage worn through to rust, chalked tally marks and a faded serial on the shield.",
+    "png": true,
+    "meshy": true
+   }
+  },
+  "approved": "v1",
+  "updated": 1795589005,
+  "model": true,
+  "model_approved": true,
+  "height": 2.6,
+  "rig": true,
+  "anim": [
+   "idle",
+   "walk",
+   "run",
+   "aim",
+   "shoot",
+   "reload",
+   "hit",
+   "death",
+   "win"
+  ]
+ },
+ "lancer": {
+  "name": "Lancer",
+  "tier": "mech",
+  "role": "Pikeman equivalent. Holds the line with long reach, counters chargers (bonus vs fast units), sturdy.",
+  "variants": {
+   "v1": {
+    "desc": "A sturdy line mech holding a very long hydraulic pike-spear in its right hand with a piston-driven drill-point tip, a tall narrow tower shield made of riveted boiler plate on its left arm; heavy planted legs with wide feet and ground-anchor spikes at the heels; military olive with an oxide-red band across the shield and stencilled numbers. Family signature shared by all our mechs: a small cluster of three recessed round optical lenses in the head housing.",
+    "png": true,
+    "meshy": true
+   },
+   "v2": {
+    "desc": "A tall armoured pikeman mech with a long telescoping lance built into its right arm, extended past the hand like a spear, a wide collar of overlapping armour plates protecting a small head, a forward-sloping chest, spiked knee guards; dirty khaki and burnt umber paint, chipped edges, a small warning-orange tip on the lance. Family signature shared by all our mechs: a small cluster of three recessed round optical lenses in the head housing.",
+    "png": true,
+    "meshy": false
+   },
+   "v3": {
+    "desc": "A heavy halberdier mech carrying a long polearm with a rotary saw-blade head and a hook, its stocky torso shaped like a cast iron stove, a ring of defensive spikes on the shoulders, thick braced legs; cold ash grey with worn olive patches, oil stains, chalked tally marks on the pole. Family signature shared by all our mechs: a small cluster of three recessed round optical lenses in the head housing.",
+    "png": true,
+    "meshy": false
+   }
+  },
+  "approved": "v1",
+  "updated": 1795621940,
+  "model": true,
+  "model_approved": true,
+  "height": 2.8,
+  "rig": true,
+  "anim": [
+   "idle",
+   "walk",
+   "attack1",
+   "attack2",
+   "hit1",
+   "hit2",
+   "death",
+   "win"
+  ]
+ },
+ "medic": {
+  "name": "Arc Medic",
+  "tier": "mech",
+  "role": "DROPPED (owner: bots do not need a medic). Replaced by the Deployer + Orbs.",
+  "variants": {
+   "v1": {
+    "desc": "A support mech built like a walking field generator: a round transformer-coil torso with ceramic insulator stacks on the shoulders, copper coils and glass vacuum tubes glowing faint warm orange through grilles, two long arms ending in open three-fingered emitter claws with copper electrodes; a faded white field with an oxide-red cross panel painted on the chest, worn and chipped; thick power cables looping from back to arms. Family signature shared by all our mechs: a small cluster of three recessed round optical lenses in the head housing.",
+    "png": true,
+    "meshy": false
+   },
+   "v2": {
+    "desc": "A slender repair mech like a battlefield priest of machines: a tall narrow body with a hooded cowl-like head armour, a tesla mast rising from its back with three ceramic insulator rings, one arm a welding and repair tool cluster, the other a open-palm arc projector; utility pouches, coiled cables, aged ivory and military olive paint with a small faded red cross on the cowl. Family signature shared by all our mechs: a small cluster of three recessed round optical lenses in the head housing.",
+    "png": true,
+    "meshy": false
+   },
+   "v3": {
+    "desc": "A stocky medic mech carrying a large cylindrical battery-pack reactor on its back, glass inspection windows showing a warm orange glow, with a flexible conduit to a staff-like arc lance held in its right hand; left forearm has a cassette of repair nanite canisters; boxy legs; khaki paint, red cross stencil half worn off, field-repair welds. Family signature shared by all our mechs: a small cluster of three recessed round optical lenses in the head housing.",
+    "png": true,
+    "meshy": false
+   }
+  },
+  "approved": null,
+  "updated": 1795616623
+ },
+ "drone": {
+  "name": "Wasp Drone",
+  "tier": "mech",
+  "role": "Flying unit. Hovers over the field, ignores ground blockers, harasses the backline; fragile.",
+  "variants": {
+   "v1": {
+    "desc": "A heavy dieselpunk hover drone the size of a car: a riveted cylindrical fuselage like a pressure tank, four ducted fans in round shrouded rings on stubby arms, a small chin turret with twin short barrels, landing skids, exposed cables and a cooling radiator; military olive with an oxide-red stripe and a faded serial. Family signature shared by all our mechs: a small cluster of three recessed round optical lenses in the head housing.",
+    "png": true,
+    "meshy": false
+   },
+   "v2": {
+    "desc": "A flying gunship drone shaped like a mechanical wasp: a segmented armoured body, two pairs of fast rotor blades on top in protective cages, a stinger-like autocannon underneath, a sensor head with three recessed round lenses, thin folded grabber legs; dusty steel blue and cold ash, rust streaks, mustard warning chevrons on the rotor guards. Family signature shared by all our mechs: a small cluster of three recessed round optical lenses in the head housing.",
+    "png": true,
+    "meshy": true
+   },
+   "v3": {
+    "desc": "A boxy tiltrotor scout drone: a cast-metal box body with two large propellers on swivelling side nacelles, a bomb rack underneath with three small canisters, a dangling antenna, a camera turret; olive drab, peeling paint, patched with welded plates. Family signature shared by all our mechs: a small cluster of three recessed round optical lenses in the head housing.",
+    "png": true,
+    "meshy": false
+   }
+  },
+  "approved": "v2",
+  "updated": 1795619292,
+  "model": true,
+  "model_approved": true,
+  "anim": [
+   "idle",
+   "fly",
+   "shoot",
+   "hit",
+   "death",
+   "win"
+  ]
+ },
+ "sniper": {
+  "name": "Longshot",
+  "tier": "mech",
+  "role": "Archer equivalent. Backline marksman: long range, slow, high single-target damage, fragile.",
+  "variants": {
+   "v1": {
+    "desc": "A tall lanky marksman mech, thinner than a soldier mech, with long stilt-like hydraulic legs and a narrow hunched torso: a very long-barrelled rail-cannon built into the right forearm, running past the hand, with a muzzle brake and cooling fins; a big telescopic sensor tube mounted beside the head; folded bipod spikes on its back; a ragged camouflage netting cloak over the shoulders in olive and dirty khaki. Family signature shared by all our mechs: a small cluster of three recessed round optical lenses in the head housing.",
+    "png": true,
+    "meshy": true
+   },
+   "v2": {
+    "desc": "A slim recon walker with a slightly forward-leaning posture and reverse-jointed bird-like legs: a long anti-materiel rifle barrel integrated along the right arm, a drum-shaped rangefinder head on a short neck that swivels, antenna whip, ammunition belts on the hips, dusty steel-blue and cold ash paint, a small faded mustard target ring stencilled on the shoulder. Family signature shared by all our mechs: a small cluster of three recessed round optical lenses in the head housing.",
+    "png": true,
+    "meshy": false
+   },
+   "v3": {
+    "desc": "A medium-height sniper mech with a heavy counterweight backpack and stabiliser fins: an oversized long gun barrel fused to the right forearm with a shoulder brace; the head is a narrow armoured visor box; lightly armoured long limbs with exposed pistons; strips of burlap and oxide-red rag tied on the barrel; worn olive drab with tally marks on the forearm. Family signature shared by all our mechs: a small cluster of three recessed round optical lenses in the head housing.",
+    "png": true,
+    "meshy": false
+   }
+  },
+  "approved": "v1",
+  "updated": 1795621940,
+  "model": true,
+  "model_approved": true,
+  "height": 3.0,
+  "rig": true,
+  "anim": [
+   "idle",
+   "walk",
+   "aim",
+   "shoot",
+   "reload",
+   "hit1",
+   "hit2",
+   "death",
+   "win"
+  ]
+ },
+ "commander": {
+  "name": "Commander",
+  "tier": "mech",
+  "role": "Leader (Duelist equivalent). Elite command mech: buffs nearby allies with an aura and wins duels against single strong enemies.",
+  "variants": {
+   "v1": {
+    "desc": "An imposing elite command mech, taller and more ornate than the line mechs but still battered: a heavy armoured torso with a high collar and an officer's command antenna array rising from the back, a large tattered oxide-red cape-banner hanging from the shoulders, a long heavy blade-sword made from a sharpened machine part in the right hand, a compact sidearm cannon on the left forearm; dark olive with aged brass trim, medal-like plaques and campaign stencils. Family signature shared by all our mechs: a small cluster of three recessed round optical lenses in the head housing.",
+    "png": true,
+    "meshy": true
+   },
+   "v2": {
+    "desc": "A duelist command mech with a lean powerful knight-like build, a pauldron on one shoulder shaped like a stylised bull horn, a long serrated chain-blade weapon in its right hand, a small round buckler shield on the left forearm, a loudspeaker horn and banner pole on its back flying a ragged war flag; cold ash and steel blue paint with ivory and mustard accents, heavy wear. Family signature shared by all our mechs: a small cluster of three recessed round optical lenses in the head housing.",
+    "png": true,
+    "meshy": false
+   },
+   "v3": {
+    "desc": "A heavy general mech like a walking bunker with a crown-like ring of armoured periscopes around its head, a massive power-fist gauntlet on the right arm and a ceremonial sabre on the left hip, a cloak of chain and canvas; burnt umber and olive with faded gold rank stripes on the shoulders, scorched and repaired. Family signature shared by all our mechs: a small cluster of three recessed round optical lenses in the head housing.",
+    "png": true,
+    "meshy": false
+   }
+  },
+  "approved": "v1",
+  "updated": 1795621940,
+  "model": true,
+  "model_approved": true,
+  "height": 3.0,
+  "rig": true,
+  "anim": [
+   "idle",
+   "walk",
+   "attack1",
+   "attack2",
+   "heavy",
+   "rally",
+   "hit1",
+   "hit2",
+   "death",
+   "win"
+  ]
+ },
+ "outrider": {
+  "name": "Outrider",
+  "tier": "mech",
+  "role": "Cavalry equivalent. Fast flanker that charges into the enemy backline, hits hard on impact, light armour.",
+  "variants": {
+   "v1": {
+    "desc": "A fast assault mech with long reverse-jointed digitigrade sprinter legs like an ostrich, a forward-leaning compact armoured torso, a heavy battering ram spike on the right forearm, large exhaust stacks and a bulky turbine engine on the back for speed; lean and aggressive silhouette; dusty khaki with a faded mustard chevron and mud-caked shins. Family signature shared by all our mechs: a small cluster of three recessed round optical lenses in the head housing.",
+    "png": true,
+    "meshy": true
+   },
+   "v2": {
+    "desc": "A light raider mech with jump-jet thrusters built into its calves and back, sleek-for-its-world but still riveted and battered: broad shoulders with front-facing ram plates, a short hydraulic lance-bayonet on the right arm, a long oxide-red pennant streaming from an antenna, olive paint scorched black around the thrusters. Family signature shared by all our mechs: a small cluster of three recessed round optical lenses in the head housing.",
+    "png": true,
+    "meshy": false
+   },
+   "v3": {
+    "desc": "A heavy-legged charger mech, like a knight's warhorse made into a machine: armoured greaves, a wedge-shaped chest plow, the right arm ending in a pneumatic piston hammer, a coiled shock-absorber spine, a mane-like row of cable bundles down its back; cold ash and steel blue paint with rust bleeding from rivets. Family signature shared by all our mechs: a small cluster of three recessed round optical lenses in the head housing.",
+    "png": true,
+    "meshy": false
+   }
+  },
+  "approved": "v1",
+  "updated": 1795620528,
+  "model": true,
+  "model_approved": true,
+  "height": 2.8,
+  "rig": true,
+  "anim": [
+   "idle",
+   "walk",
+   "run",
+   "charge",
+   "attack1",
+   "attack2",
+   "attack3",
+   "heavy",
+   "hit1",
+   "hit2",
+   "hit3",
+   "death",
+   "win"
+  ]
+ },
+ "orb": {
+  "name": "Orb",
+  "tier": "gadget",
+  "role": "Small floating drones launched by the Hacker. Roles by light colour: scout (reveals enemy info), mark, jam, patch.",
+  "variants": {
+   "v1": {
+    "desc": "A small floating spherical drone the size of a football: a riveted cast-metal sphere in olive and brass split by a band of panel seams, one big round glass lens in the front surrounded by two smaller lenses, little stabiliser fins and a stubby antenna on top, a small round thruster vent underneath, scuffed paint and a faded stencil number. Family signature shared by all our units: a small cluster of three recessed round optical lenses. The image shows ONLY this one small orb drone, alone, filling most of the frame, seen close up from a three-quarter front view. No robot, no mech, no person, no hands, no other objects. Dieselpunk analog machine detailing: riveted cast-metal, oxidation, peeling military paint, faded stencils.",
+    "png": true,
+    "meshy": false
+   },
+   "v2": {
+    "desc": "A small hovering orb drone like an old diving bell: a brass-trimmed steel sphere with three round porthole lenses glowing faint warm orange arranged in a triangle, a ring of small vents around its equator, a short whip antenna, two tiny folding manipulator claws underneath; worn military olive with rust in the seams. Family signature shared by all our units: a small cluster of three recessed round optical lenses. The image shows ONLY this one small orb drone, alone, filling most of the frame, seen close up from a three-quarter front view. No robot, no mech, no person, no hands, no other objects. Dieselpunk analog machine detailing: riveted cast-metal, oxidation, peeling military paint, faded stencils.",
+    "png": true,
+    "meshy": false
+   },
+   "v3": {
+    "desc": "A floating sensor orb shaped like a naval mine crossed with a camera: a heavy iron sphere with stubby horn-like antenna studs, a single rotating lens turret with three small round lenses, a band of rivets around the middle, a small glowing core visible through a slotted grille; charcoal and steel blue with chipped mustard markings. Family signature shared by all our units: a small cluster of three recessed round optical lenses. The image shows ONLY this one small orb drone, alone, filling most of the frame, seen close up from a three-quarter front view. No robot, no mech, no person, no hands, no other objects. Dieselpunk analog machine detailing: riveted cast-metal, oxidation, peeling military paint, faded stencils.",
+    "png": true,
+    "meshy": true
+   }
+  },
+  "approved": "v3",
+  "updated": 1795620658,
+  "model": true,
+  "model_approved": true,
+  "anim": [
+   "idle",
+   "fly",
+   "shoot",
+   "hit",
+   "death",
+   "win"
+  ]
+ },
+ "hacker": {
+  "name": "Deployer",
+  "tier": "exosuit",
+  "role": "Mage equivalent. A small backline operator with no gun: launches and steers orbs that scout the enemy, mark targets, jam them or patch allies.",
+  "variants": {
+   "v1": {
+    "desc": "A little deployer robot, about half the height of a soldier mech, squat and busy like a walking toolbox: a compact boxy body on two short stubby legs, a head unit with three recessed round lenses and a bent whip antenna, and on its back a tall rack of docking cradles holding four small round orb drones like eggs in a carton, each cradle with a cable clamp and a warm-orange status light; one arm is a stubby launcher claw for releasing orbs, the other a small hand with a wrist keyboard; olive paint with mustard hazard stripes on the cradle rack, scuffs and stencils. No gun. Family signature shared by all our units: a small cluster of three recessed round optical lenses.",
+    "png": true,
+    "meshy": false
+   },
+   "v2": {
+    "desc": "A SMALL, short, round deployer robot (only about one metre tall, much smaller than a soldier mech, with stubby child-like proportions), cute but battered, the size of a large dog standing upright: a barrel-shaped body with a big domed head and three recessed round lenses, two short legs, two thin nimble arms; a revolver-like drum magazine on its back, rotating, with round orb drones seated in its chambers and one orb halfway out of a hatch; radio antennas, coiled cables and blinking warm-orange lights; worn olive and dirty khaki with a faded serial number. No gun. Family signature shared by all our units: a small cluster of three recessed round optical lenses. Its hands are empty: absolutely no gun or weapon.",
+    "png": true,
+    "meshy": true
+   },
+   "v3": {
+    "desc": "A little deployer robot like a mobile signal station: a narrow body with a tall telescoping antenna mast and a small satellite dish, a head like a camera housing with three round lenses, a hunchback hive of hexagonal pods on its back from which small orb drones are launched, one orb hovering beside its shoulder tethered by a thin cable, long thin arms with clever three-fingered hands, small sturdy legs; steel blue and cold ash with rust streaks and tape labels. No gun. Family signature shared by all our units: a small cluster of three recessed round optical lenses.",
+    "png": true,
+    "meshy": false
+   }
+  },
+  "approved": "v2",
+  "updated": 1795621940,
+  "model": true,
+  "model_approved": true,
+  "height": 1.4,
+  "rig": true,
+  "anim": [
+   "idle",
+   "walk",
+   "deploy",
+   "hack",
+   "hit1",
+   "hit2",
+   "death",
+   "win"
+  ]
+ }
+}

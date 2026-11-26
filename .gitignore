@@ -1,0 +1,20 @@
+# screenshots, logs, scratch
+shots/
+server.log
+_*.html
+index-test.html
+# backups made before each change (kept on the server)
+*.pre-*
+# python / node
+__pycache__/
+*.pyc
+node_modules/
+# 3D pipeline intermediates (Meshy models, Blender render frames); the game loads only the baked sheets
+*.glb
+assets/units/*/frames*/
+# third-party reference screenshots
+docs/ref/
+# secrets
+.env
+# full-res Gemini art originals (the game uses the webp copies in art/)
+tools/.src/

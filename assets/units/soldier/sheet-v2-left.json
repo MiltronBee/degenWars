@@ -1,0 +1,48 @@
+{
+ "frameWidth": 218,
+ "frameHeight": 224,
+ "cols": 10,
+ "foot": [
+  0.4495,
+  0.9016
+ ],
+ "clips": {
+  "idle": {
+   "row": 0,
+   "n": 8,
+   "fps": 8,
+   "loop": true
+  },
+  "walk": {
+   "row": 1,
+   "n": 10,
+   "fps": 12,
+   "loop": true
+  },
+  "shoot": {
+   "row": 2,
+   "n": 6,
+   "fps": 14,
+   "loop": false
+  },
+  "hit": {
+   "row": 3,
+   "n": 4,
+   "fps": 12,
+   "loop": false
+  },
+  "death": {
+   "row": 4,
+   "n": 8,
+   "fps": 10,
+   "loop": false
+  },
+  "win": {
+   "row": 5,
+   "n": 8,
+   "fps": 8,
+   "loop": false
+  }
+ },
+ "look": "field"
+}

@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>degenWars · unit / field blend lab</title>
+<style>
+:root{--bg:#211e1b;--ink:#ddd9ce;--mute:#a58f70;--line:#5c4838;--acc:#af9561}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:15px/1.4 system-ui,sans-serif}
+.wrap{display:flex;flex-direction:column;height:100%;padding:10px max(10px,env(safe-area-inset-left)) max(10px,env(safe-area-inset-bottom))}
+header{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:6px}
+header b{font-size:18px;margin-right:auto}
+button,select{background:#30312f;color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:6px 11px;min-height:38px;font:600 14px system-ui;cursor:pointer}
+button.on{border-color:var(--acc);color:var(--acc)}
+.preset{font-size:15px}
+.row{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:6px}
+.row label{display:inline-flex;align-items:center;gap:5px;background:#2a2724;border:1px solid var(--line);border-radius:9px;padding:5px 9px;font-size:13px;cursor:pointer;user-select:none}
+.row label small{color:var(--mute)}
+.lyr{color:var(--mute);font-size:12px;text-transform:uppercase;letter-spacing:.06em;margin-right:2px}
+#game{flex:1;min-height:0;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+p{color:var(--mute);margin:6px 0 0;font-size:13px}
+#tag{font:700 13px system-ui;color:var(--acc)}
+</style></head>
+<body><div class="wrap">
+<header><b>Blend lab · units into the field</b>
+  <button class="preset" data-p="current">Current</button>
+  <button class="preset" data-p="rec">Recommended</button>
+  <button class="preset" data-p="recfx">Rec + post FX</button>
+  <button id="ab" title="flip between Current and Recommended every 1.5 s">A/B flip</button>
+  <span id="tag"></span>
+</header>
+<div class="row"><span class="lyr">Bake + pack</span>
+  <select id="sheet">
+    <option value="sheet">v1 bake · old paint pass (current)</option>
+    <option value="sheet-raw">v1 bake · raw</option>
+    <option value="sheet-v1-field">v1 bake · field pack pass</option>
+    <option value="sheet-v2-raw">v2 field-lit bake · raw</option>
+    <option value="sheet-v2-painted">v2 field-lit bake · old paint pass</option>
+    <option value="sheet-v2">v2 field-lit bake · field pack pass (rec)</option>
+  </select>
+  <select id="enemy" title="how the enemy squad is made">
+    <option value="flip">Enemies: flipX of the sheet</option>
+    <option value="left">Enemies: v2 left-facing bake</option>
+    <option value="none">Enemies: hidden</option>
+  </select>
+  <span id="clips"></span><button id="march">March in</button>
+</div>
+<div class="row"><span class="lyr">Runtime</span>
+  <label><input type="checkbox" data-fx="shadow"> Soft cast shadow <small>sprite</small></label>
+  <label><input type="checkbox" data-fx="probe"> Light probe tint <small>setTint</small></label>
+  <label><input type="checkbox" data-fx="haze"> Lane haze <small>twin sprite</small></label>
+  <label><input type="checkbox" data-fx="tufts"> Foreground tufts <small>sprites</small></label>
+  <label><input type="checkbox" data-fx="smoke"> Drifting smoke <small>1 tilesprite</small></label>
+  <label><input type="checkbox" data-fx="light"> Light overlay <small>2 quads</small></label>
+  <label><input type="checkbox" data-fx="grade"> Grade <small>postFX pass</small></label>
+  <label><input type="checkbox" data-fx="vignette"> Vignette <small>postFX pass</small></label>
+</div>
+<div id="game"></div>
+<p>Compare on the real field. "Recommended" = field-lit bake + field pack pass + cheap runtime (shadow, light-probe tint, lane haze, tufts, smoke): no full-screen passes, mobile-safe. Post FX are optional extras. Notes: docs/blend.md.</p>
+</div>
+<script src="../vendor/phaser-3.90.0.min.js"></script>
+<script>
+{
+const BASE='../assets/units/soldier/';
+const SHEETS=['sheet','sheet-raw','sheet-v1-field','sheet-v2-raw','sheet-v2-painted','sheet-v2','sheet-v2-left'];
+const JSONS={sheet:'sheet.json','sheet-raw':'sheet.json'};      // the v1 raw sheet shares sheet.json
+const W=1600,H=900;
+const PRESETS={
+  current:{sheet:'sheet',enemy:'flip',fx:{}},
+  rec:{sheet:'sheet-v2',enemy:'flip',fx:{shadow:1,probe:1,haze:1,tufts:1,smoke:1}},
+  recfx:{sheet:'sheet-v2',enemy:'flip',fx:{shadow:1,probe:1,haze:1,tufts:1,smoke:1,light:1,grade:1,vignette:1}},
+};
+const Q=new URLSearchParams(location.search);
+const state={sheet:'sheet',enemy:'flip',fx:{}};
+let scene=null, META={};
+
+// palette (docs/art-brief.md)
+const PAL={carbon:0x211e1b,charcoal:0x30312f,burnt:0x5c4838,olive:0x62644c,raw:0xa58f70,khaki:0xb6ad94};
+
+function makeCanvas(w,h){const c=document.createElement('canvas');c.width=w;c.height=h;return c}
+function rnd(seed){let s=seed>>>0||1;return()=>((s=Math.imul(s^s>>>15,1|s)+0x6D2B79F5|0,((s^s>>>14)>>>0)/4294967296))}
+
+class Field extends Phaser.Scene{
+  constructor(){super('field')}
+  preload(){
+    this.load.image('field','../art/field.webp');
+    this.load.image('fgtufts','../art/fg-tufts.webp'); this.load.json('fgtufts-j','../art/fg-tufts.json');
+    for(const n of SHEETS)this.load.json('j:'+n,BASE+(JSONS[n]||n+'.json'));
+    this.load.on('filecomplete',(key,type,data)=>{
+      if(type==='json'&&key.startsWith('j:')){const n=key.slice(2);META[n]=data;
+        this.load.spritesheet(n,BASE+n+'.webp',{frameWidth:data.frameWidth,frameHeight:data.frameHeight});}
+    });
+  }
+  create(){
+    scene=this;
+    const bg=this.add.image(W/2,H/2,'field');this.bgScale=Math.max(W/bg.width,H/bg.height);bg.setScale(this.bgScale);
+    this.probeInit(bg);
+    for(const n of SHEETS){const j=META[n];for(const [name,c] of Object.entries(j.clips))
+      this.anims.create({key:n+':'+name,frames:this.anims.generateFrameNumbers(n,{start:c.row*j.cols,end:c.row*j.cols+c.n-1}),frameRate:c.fps,repeat:c.loop?-1:0});}
+    this.makeTextures();
+    const tj=this.cache.json.get('fgtufts-j'), tt=this.textures.get('fgtufts'); this.nTufts=tj.frames.length;
+    tj.frames.forEach(([x,y,w,h],i)=>tt.add('c'+i,0,x,y,w,h));
+    this.squad=[];
+    const slots=[[0.30,0.80],[0.22,0.86],[0.38,0.88],[0.14,0.82],[0.26,0.93]];
+    const foes=[[0.72,0.81,1],[0.80,0.87,1],[0.66,0.91,1]];
+    [...slots,...foes].forEach(([x,y,foe],i)=>{
+      const s=this.add.sprite(-120-i*90,H*y,'sheet'); s.enemy=!!foe;
+      s.lane=y; s.setDepth(y*1000); s.homeX=W*x; s.i=i; this.squad.push(s);
+      s.oldShadow=this.add.ellipse(0,0,10,10,PAL.carbon,0.55).setDepth(y*1000-2);
+      s.shadow=this.add.image(0,0,'shadow').setDepth(y*1000-2).setTint(PAL.carbon);
+      s.contact=this.add.image(0,0,'shadow').setDepth(y*1000-1).setTint(PAL.carbon);
+      s.twin=this.add.sprite(0,0,'sheet').setDepth(y*1000+0.5);
+    });
+    this.buildTufts(slots);
+    this.smoke=this.add.tileSprite(W/2,H*0.64,W,256,'smoke').setScale(1,H*0.40/256).setDepth(950).setAlpha(0.22);   // above the far lane only: smoke drifts between the rows
+    this.lightWarm=this.add.image(W/2,H/2,'lightwarm').setDisplaySize(W,H).setDepth(3000).setBlendMode(Phaser.BlendModes.SCREEN);
+    this.lightDark=this.add.image(W/2,H/2,'lightdark').setDisplaySize(W,H).setDepth(3001);
+    this.apply(); this.march(Q.get('still')==='1');
+  }
+  // ---- light probe: a 40x23 blurred copy of the painting; sample the colour behind each unit ----
+  probeInit(bg){
+    const src=bg.texture.getSourceImage(), c=makeCanvas(40,23), g=c.getContext('2d');
+    g.filter='blur(1px)'; g.drawImage(src,0,0,40,23); this.probe=g.getImageData(0,0,40,23).data;
+  }
+  sample(x,y){
+    const px=Math.max(0,Math.min(39,Math.floor(x/W*40))), py=Math.max(0,Math.min(22,Math.floor(y/H*23))), o=(py*40+px)*4, d=this.probe;
+    return [d[o],d[o+1],d[o+2]];
+  }
+  makeTextures(){
+    // soft shadow: radial falloff
+    let c=makeCanvas(128,64), g=c.getContext('2d'), gr=g.createRadialGradient(64,32,0,64,32,64);
+    gr.addColorStop(0,'rgba(255,255,255,0.85)');gr.addColorStop(0.45,'rgba(255,255,255,0.45)');gr.addColorStop(1,'rgba(255,255,255,0)');
+    g.setTransform(1,0,0,0.5,0,16);g.fillStyle=gr;g.fillRect(0,0,128,128);this.textures.addCanvas('shadow',c);
+    // drifting smoke: soft blobs, tiles horizontally, fades top and bottom
+    const R=rnd(7); c=makeCanvas(1024,256); g=c.getContext('2d');
+    for(let i=0;i<90;i++){const x=R()*1024,y=60+R()*140,r=30+R()*90,a=0.05+R()*0.10,col=R()<0.6?'78,70,56':'96,104,94';
+      for(const ox of [-1024,0,1024]){const q=g.createRadialGradient(x+ox,y,0,x+ox,y,r);q.addColorStop(0,`rgba(${col},${a})`);q.addColorStop(1,`rgba(${col},0)`);g.fillStyle=q;g.fillRect(x+ox-r,y-r,r*2,r*2);}}
+    g.globalCompositeOperation='destination-in';let v=g.createLinearGradient(0,0,0,256);
+    v.addColorStop(0,'rgba(0,0,0,0)');v.addColorStop(0.35,'rgba(0,0,0,1)');v.addColorStop(0.75,'rgba(0,0,0,0.8)');v.addColorStop(1,'rgba(0,0,0,0)');g.fillStyle=v;g.fillRect(0,0,1024,256);
+    this.textures.addCanvas('smoke',c);
+    // light overlay: the horizon glow (back-left) and the teal smoke sky (right), screen-blended
+    c=makeCanvas(400,225); g=c.getContext('2d');
+    let q=g.createRadialGradient(90,75,0,90,75,260);q.addColorStop(0,'rgba(120,84,40,0.55)');q.addColorStop(1,'rgba(120,84,40,0)');g.fillStyle=q;g.fillRect(0,0,400,225);
+    q=g.createRadialGradient(360,60,0,360,60,220);q.addColorStop(0,'rgba(30,58,52,0.55)');q.addColorStop(1,'rgba(30,58,52,0)');g.fillStyle=q;g.fillRect(0,0,400,225);
+    this.textures.addCanvas('lightwarm',c);
+    // ...and the darker foreground / edges the painting already has, applied to everything above it
+    c=makeCanvas(400,225); g=c.getContext('2d'); v=g.createLinearGradient(0,0,0,225);
+    v.addColorStop(0,'rgba(33,30,27,0)');v.addColorStop(0.7,'rgba(33,30,27,0)');v.addColorStop(1,'rgba(33,30,27,0.45)');g.fillStyle=v;g.fillRect(0,0,400,225);
+    this.textures.addCanvas('lightdark',c);
+    // foreground tufts: dry grass and debris, painted as tapered strokes in field colours
+    const cols=['#211e1b','#30312f','#3d3428','#4a4030','#5c4838','#62644c','#52503c'];
+    for(let t=0;t<6;t++){
+      const R=rnd(101+t*17), w=180, h=90; c=makeCanvas(w,h); g=c.getContext('2d');
+      // mud dab at the base
+      for(let i=0;i<9;i++){g.fillStyle=cols[(R()*3)|0];g.beginPath();g.ellipse(w*0.15+R()*w*0.7,h-6-R()*6,6+R()*14,3+R()*4,R()-0.5,0,Math.PI*2);g.fill();}
+      const n=26+(R()*22|0);
+      for(let i=0;i<n;i++){
+        const x=w*0.12+R()*w*0.76, bh=18+R()*R()*70, lean=(R()-0.35)*bh*0.7, bw=1.5+R()*3.2;
+        g.fillStyle=R()<0.08?'#8a7a5c':cols[(R()*cols.length)|0];
+        g.beginPath();g.moveTo(x-bw,h-4);g.quadraticCurveTo(x+lean*0.3,h-4-bh*0.6,x+lean,h-4-bh);g.quadraticCurveTo(x+lean*0.3+bw*0.5,h-4-bh*0.55,x+bw,h-4);g.closePath();g.fill();
+      }
+      if(t%2){g.fillStyle='#2b2722';g.save();g.translate(w*0.3+R()*w*0.4,h-14);g.rotate(-0.4+R()*0.8);g.fillRect(-26,-4,52,7);g.restore();}   // a broken strut
+      this.textures.addCanvas('tuft'+t,c);
+    }
+  }
+  buildTufts(slots){
+    this.tufts=[]; const R=rnd(42);
+    // painted clumps (tools/gen-foreground.py), tinted a little toward the ground they sit on
+    const put=(x,y,depth,k)=>{const t=this.add.image(x,y,'fgtufts','c'+((R()*this.nTufts)|0)).setOrigin(0.5,0.92).setDepth(depth).setScale(k*(0.85+R()*0.3)).setFlipX(R()<0.5);
+      const c=this.sample(x,y-10); t.setTint(Phaser.Display.Color.GetColor(...c.map(v=>Math.min(255,110+v*0.75)))); this.tufts.push(t);};
+    // a broken row of tufts on each lane's ground line, in front of that lane, so feet sink into the field
+    for(const [x0,y] of slots){const k=0.42+(y-0.8)*1.6;put(W*x0+(R()<0.5?-1:1)*(45+R()*30),H*y+6,y*1000+1,k);if(R()<0.6)put(W*x0-150-R()*170,H*y+4+R()*8,y*1000+1,k*0.8);}
+    // and a dark foreground band at the bottom edge
+    for(let x=-60;x<W+80;x+=150+R()*220)put(x,H+18+R()*20,5000,1.0+R()*0.5);
+  }
+  apply(){
+    const fx=state.fx;
+    this.squad.forEach(s=>{s.oldShadow.visible=!fx.shadow;s.shadow.visible=s.contact.visible=!!fx.shadow;s.twin.visible=!!fx.haze;
+      const k=s.anims.currentAnim?s.anims.currentAnim.key.split(':')[1]:'walk';this.play(s,k,true)});
+    this.tufts.forEach(t=>t.visible=!!fx.tufts);
+    this.smoke.visible=!!fx.smoke; this.lightWarm.visible=this.lightDark.visible=!!fx.light;
+    const cam=this.cameras.main; cam.postFX.clear();
+    if(fx.grade){const cm=cam.postFX.addColorMatrix();cm.saturate(-0.12);cm.brightness(0.95,true);}
+    if(fx.vignette)cam.postFX.addVignette(0.5,0.48,0.95,0.32);
+    document.querySelectorAll('[data-fx]').forEach(b=>b.checked=!!fx[b.dataset.fx]);
+    document.getElementById('sheet').value=state.sheet; document.getElementById('enemy').value=state.enemy;
+    const p=Object.entries(PRESETS).find(([,v])=>v.sheet===state.sheet&&v.enemy===state.enemy&&JSON.stringify(Object.keys(v.fx).sort())===JSON.stringify(Object.keys(fx).filter(k=>fx[k]).sort()));
+    document.querySelectorAll('.preset').forEach(b=>b.classList.toggle('on',!!p&&b.dataset.p===p[0]));
+    document.getElementById('tag').textContent=p?{current:'CURRENT',rec:'RECOMMENDED',recfx:'REC + POST FX'}[p[0]]:'custom';
+  }
+  play(s,clip,keepFrame){
+    const left=s.enemy&&state.enemy==='left', n=left?'sheet-v2-left':state.sheet, j=META[n], k=H*0.30/j.frameHeight*(0.85+s.lane*0.2);
+    const flip=s.enemy&&!left; s.visible=!s.enemy||state.enemy!=='none';
+    const prog=keepFrame&&s.anims.currentAnim?s.anims.getProgress():0;
+    s.setTexture(n).setFlipX(flip).setOrigin(flip?1-j.foot[0]:j.foot[0],j.foot[1]).setScale(k); s.play(n+':'+clip,true);
+    if(keepFrame&&prog)s.anims.setProgress(prog);
+    s.k=k; s.j=j;
+  }
+  update(time){
+    if(!this.squad)return;
+    const fx=state.fx;
+    if(this.smoke.visible)this.smoke.tilePositionX=time*0.012;
+    this.squad.forEach(s=>{
+      const dw=s.j.frameWidth*s.k, dh=s.j.frameHeight*s.k;
+      const dead=s.anims.currentAnim&&s.anims.currentAnim.key.endsWith(':death')&&s.anims.currentFrame&&s.anims.currentFrame.index>4;
+      s.oldShadow.setPosition(s.x,s.y-2).setDisplaySize(dw*0.62,dh*0.07);
+      s.oldShadow.visible=!fx.shadow&&!dead;
+      // light comes from the back-left horizon: the cast shadow falls forward and to the right
+      s.shadow.setPosition(s.x+dw*0.16,s.y+dh*0.005).setDisplaySize(dw*(dead?1.1:0.95),dh*0.10).setAlpha(0.55);
+      s.contact.setPosition(s.x+dw*0.02,s.y).setDisplaySize(dw*(dead?0.9:0.42),dh*0.045).setAlpha(0.75);
+      // light probe: tint toward the colour of the painting behind the unit's torso
+      if(fx.probe){const c=this.sample(s.x,s.y-dh*0.45), m=Math.max(c[0],c[1],c[2],1), near=(s.lane-0.80)/0.13;
+        const dark=0.90-0.12*near;   // the painting's foreground is darker
+        s.setTint(Phaser.Display.Color.GetColor(...c.map(v=>Math.round(255*dark*(1-0.30+0.30*v/m)))));}
+      else s.clearTint();
+      // lane haze: a tint-filled twin in the local air colour; far lanes take more of it
+      if(fx.haze){const far=Math.max(0,(0.93-s.lane)/0.13), c=this.sample(s.x,s.y-dh*0.35);
+        s.twin.setTexture(s.texture.key,s.frame.name).setOrigin(s.originX,s.originY).setScale(s.scaleX,s.scaleY).setPosition(s.x,s.y).setFlipX(s.flipX)
+          .setTintFill(Phaser.Display.Color.GetColor(...c)).setAlpha(0.14*far);}
+    });
+  }
+  march(still){
+    this.squad.forEach(s=>{
+      if(s.enemy){s.x=s.homeX;this.tweens.killTweensOf(s);this.time.delayedCall(still?0:3000+Math.random()*600,()=>this.fire(s));return;}
+      this.tweens.killTweensOf(s); s.x=still?s.homeX:-120-s.i*90; this.play(s,still?'shoot':'walk');
+      if(still){this.fire(s);return;}
+      this.tweens.add({targets:s,x:s.homeX,duration:2600+s.i*250,ease:'Linear',onComplete:()=>this.fire(s)});
+    });
+  }
+  fire(s){
+    this.play(s,'shoot');
+    s.once('animationcomplete',()=>{this.flash(s);this.time.delayedCall(300+Math.random()*700,()=>{if(s.anims.currentAnim&&s.anims.currentAnim.key.endsWith(':shoot'))this.fire(s)})});
+  }
+  flash(s){
+    if(!s.visible)return; const d=s.enemy?-1:1, mx=s.x+d*s.displayWidth*0.42, my=s.y-s.displayHeight*0.52;
+    const f=this.add.circle(mx,my,10,0xf0a040,0.9).setDepth(s.depth+1).setBlendMode('ADD');
+    this.tweens.add({targets:f,scale:2.2,alpha:0,duration:120,onComplete:()=>f.destroy()});
+    const t=this.add.line(0,0,mx,my,mx+d*(260+Math.random()*200),my+Math.random()*30-15,0xffc070,0.7).setOrigin(0).setLineWidth(2).setDepth(s.depth+1);
+    this.tweens.add({targets:t,alpha:0,duration:140,onComplete:()=>t.destroy()});
+  }
+}
+
+function setPreset(p){state.sheet=PRESETS[p].sheet;state.enemy=PRESETS[p].enemy;state.fx={...PRESETS[p].fx};if(scene)scene.apply();}
+setPreset(Q.get('preset')||'rec');
+if(Q.get('sheet'))state.sheet=Q.get('sheet'); if(Q.get('enemy'))state.enemy=Q.get('enemy');
+if(Q.get('fx')!==null&&Q.get('fx')!==undefined&&Q.has('fx')){state.fx={};Q.get('fx').split(',').filter(Boolean).forEach(k=>state.fx[k]=1);}
+new Phaser.Game({type:Phaser.WEBGL,parent:'game',backgroundColor:'#211e1b',scale:{mode:Phaser.Scale.FIT,autoCenter:Phaser.Scale.CENTER_BOTH,width:W,height:H},scene:Field});
+
+document.querySelectorAll('.preset').forEach(b=>b.onclick=()=>{stopAB();setPreset(b.dataset.p)});
+document.querySelectorAll('[data-fx]').forEach(b=>b.onchange=()=>{state.fx[b.dataset.fx]=b.checked?1:0;scene&&scene.apply()});
+document.getElementById('sheet').onchange=e=>{state.sheet=e.target.value;scene&&scene.apply()};
+document.getElementById('enemy').onchange=e=>{state.enemy=e.target.value;scene&&scene.apply()};
+document.getElementById('march').onclick=()=>scene&&scene.march();
+const clips=['idle','walk','shoot','hit','death','win'], box=document.getElementById('clips');
+box.innerHTML=clips.map(c=>`<button data-c="${c}">${c}</button>`).join(' ');
+box.querySelectorAll('button').forEach(b=>b.onclick=()=>{if(!scene)return;const c=b.dataset.c;scene.squad.forEach(s=>{if(!s.visible)return;scene.tweens.killTweensOf(s);s.x=s.homeX;c==='shoot'?scene.fire(s):scene.play(s,c)})});
+let abT=null;const abBtn=document.getElementById('ab');
+function stopAB(){clearInterval(abT);abT=null;abBtn.classList.remove('on')}
+abBtn.onclick=()=>{if(abT){stopAB();return}abBtn.classList.add('on');let f=0;setPreset('current');abT=setInterval(()=>{f^=1;setPreset(f?'rec':'current')},1500)};
+}
+</script>
+</body></html>

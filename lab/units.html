@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>degenWars · Unit pipeline</title>
+<script type="module" src="https://unpkg.com/@google/model-viewer@3.5.0/dist/model-viewer.min.js"></script>
+<style>
+:root{--bg:#211e1b;--panel:#30312f;--line:#5c4838;--ink:#ddd9ce;--mute:#a58f70;--ochre:#af9561;--oxide:#864f3b}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,sans-serif}
+header{padding:20px max(16px,4vw);border-bottom:1px solid var(--line)}
+h1{margin:0;font-size:28px;letter-spacing:.02em}
+header p{margin:6px 0 0;color:var(--mute);max-width:80ch}
+.steps{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;font-size:13px}
+.steps span{border:1px solid var(--line);border-radius:999px;padding:3px 10px;color:var(--mute)}
+main{padding:16px max(16px,4vw) 60px}
+.unit{margin:18px 0 40px}
+.unit h2{margin:0;font-size:24px}
+.unit .role{color:var(--mute);margin:4px 0 12px}
+.badge{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;border:2px solid var(--oxide);color:#d98a6c;border-radius:4px;padding:1px 6px;margin-left:8px;vertical-align:middle}
+.badge.ok{border-color:#62644c;color:#b6c08f}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
+figure{margin:0;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+figure img{display:block;width:100%;aspect-ratio:3/4;object-fit:contain;background:#c8c6c0;cursor:zoom-in}
+figure.meshy img{background:#e4e2dc}
+figcaption{padding:10px 12px;font-size:14px;color:#cfc6b4}
+figcaption b{display:block;font-size:16px;color:var(--ink);margin-bottom:2px}
+figure.m3d .clips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}figure.m3d .clips button{background:#30312f;color:#ddd9ce;border:1px solid #5c4838;border-radius:8px;padding:6px 10px;min-height:36px;font:600 13px system-ui;cursor:pointer}figure.m3d .clips button.on{border-color:#af9561;color:#af9561}
+figure.m3d model-viewer{display:block;width:100%;aspect-ratio:3/4;background:radial-gradient(#5a5048,#2a241f)}
+.zoom{position:fixed;inset:0;background:rgba(10,8,6,.92);display:none;place-items:center;z-index:9;cursor:zoom-out}
+.zoom img{max-width:96vw;max-height:94vh}
+.zoom.on{display:grid}
+.empty{color:var(--mute)}
+</style></head>
+<body>
+<header>
+  <h1>Unit pipeline</h1>
+  <p>One unit at a time. Pick a painted design, then its clean "Meshy render" is made from it, then Meshy builds the 3D model, then it's rigged and animated. Nothing goes to Meshy without your sign-off.</p>
+  <div class="steps"><span>1 · Painted concept</span><span>2 · Meshy render</span><span>3 · Meshy 3D</span><span>4 · Rig + animate</span><span>5 · Baked sprites in game</span></div>
+</header>
+<main id="m"><p class="empty">Loading…</p></main>
+<div class="zoom" id="z"><img alt=""></div>
+<script>
+{
+const m=document.getElementById('m'),z=document.getElementById('z');
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+z.onclick=()=>z.classList.remove('on');
+fetch('../data/concepts-status.json',{cache:'no-cache'}).then(r=>r.json()).then(st=>{
+  const units=Object.entries(st).sort((a,b)=>b[1].updated-a[1].updated);
+  if(!units.length){m.innerHTML='<p class="empty">No concepts yet.</p>';return}
+  m.innerHTML=units.map(([id,u])=>{
+    let figs=Object.entries(u.variants).flatMap(([v,x])=>{
+      const out=[];
+      if(x.png)out.push(`<figure><img loading="lazy" src="../art/concepts/${esc(id)}/${esc(id)}-${esc(v)}.webp?t=${u.updated}" alt=""><figcaption><b>${esc(v)} · painted concept</b>${esc(x.desc)}</figcaption></figure>`);
+      if(x.meshy)out.push(`<figure class="meshy"><img loading="lazy" src="../art/concepts/${esc(id)}/${esc(id)}-${esc(v)}-meshy.webp?t=${u.updated}" alt=""><figcaption><b>${esc(v)} · Meshy render</b>Clean hard-surface render made from the painted concept; this is what Meshy receives.</figcaption></figure>`);
+      return out;
+    }).join('');
+    if(u.anim)figs+=`<figure class="m3d anim"><model-viewer data-unit="${esc(id)}" src="../assets/units/${esc(id)}/anim.glb?t=${u.updated}" camera-controls autoplay animation-name="${esc(u.anim[0])}" camera-orbit="60deg 80deg auto" shadow-intensity="1" exposure="1.05" alt="Animated 3D model"></model-viewer><figcaption><b>Rigged + animated (UAL)</b><span class="clips">${u.anim.map(c=>`<button data-clip="${esc(c)}">${esc(c)}</button>`).join('')}</span></figcaption></figure>`;
+    if(u.model)figs+=`<figure class="m3d"><model-viewer src="../assets/units/${esc(id)}/model.glb?t=${u.updated}" poster="../assets/units/${esc(id)}/thumb.png?t=${u.updated}" camera-controls auto-rotate auto-rotate-delay="0" rotation-per-second="25deg" shadow-intensity="1" exposure="1.05" alt="3D model"></model-viewer><figcaption><b>Meshy 3D model ${u.model_approved?'· approved':'· awaiting your sign-off'}</b>Drag to orbit, scroll or pinch to zoom.</figcaption></figure>`;
+    const badge=u.approved?`<span class="badge ok">Approved: ${esc(u.approved)}</span>`:'<span class="badge">Awaiting your pick</span>';
+    return `<section class="unit"><h2>${esc(u.name)} ${badge}</h2><p class="role">${esc(u.tier||'')} · ${esc(u.role||'')}</p><div class="grid">${figs}</div></section>`;
+  }).join('');
+  m.querySelectorAll('figure.anim').forEach(f=>{const mv=f.querySelector('model-viewer');f.querySelectorAll('[data-clip]').forEach(btn=>btn.onclick=()=>{mv.animationName=btn.dataset.clip;mv.play();f.querySelectorAll('[data-clip]').forEach(x=>x.classList.toggle('on',x===btn))})});
+  m.querySelectorAll('figure img').forEach(i=>i.onclick=()=>{z.querySelector('img').src=i.src;z.classList.add('on')});
+}).catch(()=>{m.innerHTML='<p class="empty">Could not load data/concepts-status.json.</p>'});
+}
+</script>
+</body></html>
