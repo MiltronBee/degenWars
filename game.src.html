@@ -340,8 +340,18 @@ h1,h2,h3,.disp{font-family:'Russo One','Chakra Petch',sans-serif;font-weight:400
 .float{position:absolute;top:-10%;left:50%;transform:translateX(-50%);font-weight:700;font-size:15px;pointer-events:none;text-shadow:0 2px 0 #000,0 0 4px #000;animation:float .8s forwards;z-index:5;white-space:nowrap}
 @keyframes float{to{transform:translate(-50%,-30px);opacity:0}}
 .hearts{display:inline-flex;gap:1px;margin-left:6px;vertical-align:-1px;letter-spacing:0}
-.hearts i{font-style:normal;color:#e0503a;text-shadow:0 1px 0 #000,0 0 5px rgba(224,80,58,.55);font-size:12px}
+.hearts i{display:inline-block;font-style:normal;color:#e0503a;text-shadow:0 1px 0 #000,0 0 5px rgba(224,80,58,.55);font-size:15px;line-height:1}
 .hearts i.off{color:#4a3a30;text-shadow:0 1px 0 #000}
+/* a lost heart (heartBreak): red vignette, a big heart that splits in two, the WAVE LOST caption */
+.hb{position:absolute;inset:0;z-index:980;pointer-events:none;display:grid;place-items:center}
+.hb-vig{position:absolute;inset:0;opacity:0;background:radial-gradient(closest-side,transparent 40%,rgba(170,18,8,.6))}
+.hb-h{position:relative;width:min(150px,32%);aspect-ratio:10/9;filter:drop-shadow(0 0 16px rgba(255,60,40,.8)) drop-shadow(0 5px 6px rgba(0,0,0,.6))}
+.hb-h svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.hb-h .hb-l,.hb-h .hb-r{opacity:0}
+.hb-h path{fill:#d8342a;stroke:#3a0a06;stroke-width:3;stroke-linejoin:round}
+.hb-t{position:absolute;left:0;right:0;top:calc(50% + min(78px,18%));text-align:center;opacity:0;text-shadow:0 2px 0 #000,0 0 12px rgba(0,0,0,.85)}
+.hb-t b{display:block;font:400 32px/1 'Russo One',sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#ff6b5a}
+.hb-t span{display:block;margin-top:8px;font:400 19px/1 'Russo One',sans-serif;color:#f0dcb0}
 /* settings: HUD gear, volume sliders, mute toggle */
 .hud-gear{flex:none;display:grid;place-items:center;width:34px;height:34px;padding:0;border-radius:8px;background:rgba(24,21,18,.9);border:1px solid #57472f;color:#d9a441;cursor:pointer;box-shadow:inset 0 1px 3px rgba(0,0,0,.65)}
 .hud-gear svg{width:20px;height:20px}
@@ -1236,10 +1246,10 @@ const isBoss=w=>w%10===0, isElite=w=>w%10===5;
 // Count n = min(nMax, n0 + ceil(nPer·w)) on every level; elite waves carry 1 + floor(w/10) elites.
 const BAL={
  a:3.4, b:.62, c:.015,
- early:[[.8,1.5,2.4,3.4],[.68,1.75],[.45,1.55]],   // the first waves, absolute, per theme (level 1 eases in over 4 waves)
+ early:[[1,1.9,3,4.1],[.68,1.75],[.45,1.55]],      // the first waves, absolute, per theme (level 1 eases in over 4 waves; owner: v3's 0.8-3.4 felt too easy)
  theme:[1,.58,.49],                                // Zombie Horde, Alien Swarm, Rogue Machines
  boss:[[.7,1,1.15],[.54,.53,.45],[.6,.7,.75]],      // boss-wave spike per theme at waves 10/20/30
- eliteWave:[1,.95,.9],                             // elite-wave spike at waves 5/15/25
+ eliteWave:[1.15,.95,.9],                          // elite-wave spike at waves 5/15/25
  lvlStep:1.08,
  ease:{k:.7,until:26},                              // level 1 only, a learning ramp: the curve starts at 70% of itself and is full by wave 26
  econ:{start:48,turn:25,wave:0,grow:1.5},           // run economy: start energy, income per turn (+wave·(w−1)), spin cost growth per spin in a turn
@@ -1307,9 +1317,10 @@ const saveSettings=()=>{try{localStorage.setItem(SET_KEY,JSON.stringify(settings
 // Every sound has a category (SFX.cat, unlisted = sfx). Each category is a gain bus under the master bus:
 //   music: looped tracks from audio/music/<name>.mp3 (SFX.music)  ·  sfx: game sounds  ·  ui: interface sounds (none yet)
 const SFX={ctx:null,buf:{},nz:{},bus:{},track:null,last:{},gap:{hit:45,crit:60,explode:50,coin:40,click:40,button:40}, // gap: min ms between two plays of one sound
- cat:{lever:'sfx',roll:'sfx',win:'sfx',lose:'sfx',hit:'sfx',crit:'sfx',explode:'sfx',coin:'sfx',click:'ui',button:'ui'},
+ cat:{lever:'sfx',roll:'sfx',win:'sfx',lose:'sfx',hit:'sfx',crit:'sfx',explode:'sfx',coin:'sfx',heart:'sfx',beat:'sfx',click:'ui',button:'ui'},
  CATS:[['music','Music'],['sfx','Effects'],['ui','Interface']], // category id, settings label
- trim:{hit:1.34,coin:1.47,win:1.19,roll:1.09,button:1.4}, // per-file lift to one loudness: printed by tools/prep-audio.py (re-run it after changing audio/src)
+ trim:{hit:1.34,coin:1.47,win:1.19,roll:1.09,button:1.4,heart:1.2}, // per-file lift to one loudness: printed by tools/prep-audio.py (re-run it after changing audio/src);
+   // heart is held to 1.2 (the script says 1.91, but its long tail drags the average down and its crack already peaks at -1 dB)
  loops:{roll:[.5,4.6]}, // loop range in s inside the steady part, only reached by very long spins
  init(){if(this.ctx)return this.ctx;const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return null;try{this.ctx=new AC()}catch(e){return null}
   const c=this.ctx;this.bus.master=c.createGain();this.bus.master.connect(c.destination);
@@ -1351,17 +1362,19 @@ const SFX={ctx:null,buf:{},nz:{},bus:{},track:null,last:{},gap:{hit:45,crit:60,e
  synth(name,vol,rate){const c=this.ctx,t=c.currentTime,out=c.createGain();out.gain.value=vol;out.connect(this.out(name));
   const env=(node,peak,dur,at=0)=>{const g=c.createGain();g.gain.setValueAtTime(peak,t+at);g.gain.exponentialRampToValueAtTime(.001,t+at+dur);node.connect(g).connect(out)};
   const tone=(type,f0,f1,dur,peak,at=0)=>{const o=c.createOscillator();o.type=type;o.frequency.setValueAtTime(f0*rate,t+at);o.frequency.exponentialRampToValueAtTime(f1*rate,t+at+dur);env(o,peak,dur,at);o.start(t+at);o.stop(t+at+dur+.02)};
-  const hiss=(f,q,dur,peak,type='bandpass')=>{let nb=this.nz[dur];if(!nb){nb=this.nz[dur]=c.createBuffer(1,Math.ceil(c.sampleRate*dur),c.sampleRate);const d=nb.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1}
-   const s=c.createBufferSource(),bq=c.createBiquadFilter();s.buffer=nb;bq.type=type;bq.frequency.value=f*rate;bq.Q.value=q;s.connect(bq);env(bq,peak,dur);s.start(t)};
+  const hiss=(f,q,dur,peak,type='bandpass',at=0)=>{let nb=this.nz[dur];if(!nb){nb=this.nz[dur]=c.createBuffer(1,Math.ceil(c.sampleRate*dur),c.sampleRate);const d=nb.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1}
+   const s=c.createBufferSource(),bq=c.createBiquadFilter();s.buffer=nb;bq.type=type;bq.frequency.value=f*rate;bq.Q.value=q;s.connect(bq);env(bq,peak,dur,at);s.start(t+at)};
   if(name==='hit'){hiss(2200,.9,.07,.55);tone('triangle',190,70,.09,.6)}
   else if(name==='crit'){hiss(1200,.7,.16,.8);tone('square',150,45,.16,.35);tone('triangle',380,120,.1,.4)}
   else if(name==='explode'){hiss(700,.5,.55,.9,'lowpass');tone('sine',110,32,.45,.9)}
   else if(name==='coin'){tone('square',1320,1320,.05,.12);tone('square',1760,1760,.09,.12,.05)}
+  else if(name==='beat'){tone('sine',95,45,.16,1);tone('sine',90,42,.16,.85,.22)} // thump, thump (the heart before it breaks)
+  else if(name==='heart'){hiss(2600,.7,.18,.7);tone('sine',70,30,.5,.8);tone('triangle',520,90,.55,.3)} // the crack (audio/heart.mp3 replaces it)
   else{out.disconnect();return null}
   return {out}}};
 window.degenSfx=SFX;
 ['pointerdown','keydown'].forEach(ev=>addEventListener(ev,()=>{const c=SFX.init();if(c&&c.state==='suspended')c.resume();if(SFX.track&&SFX.track.el.paused)SFX.track.el.play().catch(()=>{})},{capture:true,passive:true}));
-['lever','roll','win','lose','hit','crit','explode','coin','click','button'].forEach(n=>SFX.load(n,`audio/${n}.mp3`));
+['lever','roll','win','lose','hit','crit','explode','coin','heart','click','button'].forEach(n=>SFX.load(n,`audio/${n}.mp3`));
 bus.on('lever_release',d=>SFX.play('lever',{vol:.75+.25*(d.power||0)})); // harder pull = louder slam
 // the reels roll from the pull until the last reel lands (tease and slam-stop included: both just move that last stop)
 let rollSnd=null;const stopRoll=(ms=140)=>{if(rollSnd){rollSnd.stop(ms);rollSnd=null}};
@@ -1462,7 +1475,9 @@ const FX=(()=>{
  const collect=(x,y,vals,tx,ty,done,kind='coin')=>{if(RM()){vals.forEach(v=>done(v));return}const cell=kind==='cell';
   vals.forEach((v,i)=>{const a=rr(-Math.PI*.85,-Math.PI*.15),sp=rr(220,420);add({type:'coin',cell,x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,g:1400,s:cell?rr(18,24):rr(13,17),vr:rr(8,18),drag:.99,
    t1:rr(.32,.42)+i*.05,t2:rr(.42,.55),life:9,tx,ty,v,done})})};
- return {tokens,sparks,smoke,dust,explode,hit,boom,collect};
+ const shards=(x,y)=>{add({type:'glow',x,y,s:150,grow:.6,a:.8,life:.25});add({type:'ring',x,y,r0:10,r1:120,w:5,c:'#ff4a3a',life:.45});sparks(x,y,10,.9);
+  const cols=['#d8342a','#ff6b5a','#8a1a12','#f0a090'];for(let i=0;i<16;i++){const a=rr(-Math.PI,0),v=rr(160,460);add({type:'debris',x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,g:1500,s:rr(4,9),c:cols[i%4],life:rr(.7,1.1),vr:rr(-16,16)})}};
+ return {tokens,sparks,smoke,dust,explode,hit,boom,collect,shards};
 })();
 // ---- juice primitives ----
 // trauma shake (Eiserloh, GDC 2016): offset = max * trauma^2 * noise, applied to the cabinet only
@@ -2361,6 +2376,27 @@ function dropEnergy(x,y,v){if(!v)return;const el=$('#hudEnergy svg')||$('#hudEne
  const n=Math.min(v,5),vals=Array.from({length:n},(_,i)=>Math.floor(v/n)+(i<v%n?1:0));
  if(!r||!r.width){tweenEnergy(R.energy);renderEbar();return}
  FX.collect(x,y,vals,r.left+r.width/2,r.top+r.height/2,val=>{tweenEnergy(Math.min(R.energy,(shownEnergy??R.energy)+val));renderEbar();SFX.play('coin',{vol:.22,rate:1.35})},'cell')}
+// a lost heart: a big heart pops over the field, beats twice, cracks along one jagged line and falls apart in two halves
+const HEART_W='M50 16C46 7 38 0 27 0C12 0 0 10 0 25C0 45 20 65 50 88C80 65 100 45 100 25C100 10 88 0 73 0C62 0 54 7 50 16Z',
+ HEART_L='M50 16C46 7 38 0 27 0C12 0 0 10 0 25C0 45 20 65 50 88L53 74L46 60L55 45L44 32Z',
+ HEART_R='M50 16C54 7 62 0 73 0C88 0 100 10 100 25C100 45 80 65 50 88L53 74L46 60L55 45L44 32Z';
+function heartBreak(left,done){const fl=$('#field');if(!fl)return done();
+ const o=document.createElement('div');o.className='hb';
+ o.innerHTML=`<div class="hb-vig"></div><div class="hb-h"><svg viewBox="0 0 100 90" class="hb-w"><path d="${HEART_W}"/></svg><svg viewBox="0 0 100 90" class="hb-l"><path d="${HEART_L}"/></svg><svg viewBox="0 0 100 90" class="hb-r"><path d="${HEART_R}"/></svg></div><div class="hb-t"><b>Wave lost</b><span>−1 ♥ · ${left} left</span></div>`;
+ fl.appendChild(o);const h=o.querySelector('.hb-h'),T=o.querySelector('.hb-t'),end=()=>{o.remove();done()};
+ if(RM()){T.style.opacity=1;SFX.play('heart',{vol:.9});setTimeout(end,1200);return}
+ h.animate([{transform:'scale(.2)',opacity:0},{transform:'scale(1.15)',opacity:1,offset:.7},{transform:'scale(1)',opacity:1}],{duration:250,easing:'ease-out',fill:'both'});
+ setTimeout(()=>SFX.play('beat'),250); // two thumps on the two pulses below; the crack sounds at the split
+ for(const at of [250,470])h.animate([{transform:'scale(1)'},{transform:'scale(1.13)',offset:.3},{transform:'scale(1)'}],{duration:200,delay:at,easing:'ease-out'});
+ setTimeout(()=>{const c=rc(h);FX.shards(c.x,c.y);camShake(.6);SFX.play('heart',{vol:.9})},750);
+ o.querySelector('.hb-vig').animate([{opacity:0},{opacity:.9,offset:.15},{opacity:0}],{duration:1300,delay:740});
+ o.querySelector('.hb-w').animate([{opacity:1},{opacity:0}],{duration:1,delay:750,fill:'forwards'}); // whole until it splits
+ const fall=(el,d)=>el.animate([{transform:'none',opacity:1},{transform:`translate(${d*5}px,0) rotate(${d*7}deg)`,opacity:1,offset:.12},{transform:`translate(${d*46}px,170px) rotate(${d*38}deg)`,opacity:0}],{duration:850,delay:750,easing:'cubic-bezier(.45,0,.9,.55)',fill:'forwards'}); // forwards only: hidden (CSS) until the split
+ fall(o.querySelector('.hb-l'),-1);fall(o.querySelector('.hb-r'),1);
+ T.animate([{opacity:0,transform:'translateY(10px) scale(.9)'},{opacity:1,transform:'none',offset:.15},{opacity:1,offset:.8},{opacity:0}],{duration:1300,delay:750,fill:'both'});
+ setTimeout(end,2000)}
+// the ribbon heart that was just lost flares up and goes dark
+function heartLostPulse(){const h=$$('.hearts i')[R.lives];if(h&&!RM())h.animate([{transform:'scale(2.6)',color:'#ff4a3a',textShadow:'0 0 12px #ff4a3a'},{transform:'scale(1)'}],{duration:900,easing:'cubic-bezier(.3,1.4,.5,1)'})}
 function showCredits(c){const h=$('#hudCredits b'),a=$('#shop small'),b=$('#shop2c');if(h)h.textContent=c;if(a)a.textContent=c+'c';if(b)b.textContent=c+' credits';
  const el=h?$('#hudCredits'):a?.closest('button')||b?.closest('button');if(el&&!RM())el.animate([{transform:'scale(1)'},{transform:'scale(1.14)',filter:'brightness(1.5)'},{transform:'scale(1)'}],{duration:200})}
 function separate(arr){const l=alive(arr).filter(f=>!f.orb||f.out);
@@ -2394,7 +2430,8 @@ function endWave(won){
    const tier=dropTier(R.wave),boss=isBoss(R.wave),show=()=>{closeModal();nextTurn();toast(`${boss?'Boss down · ':''}+${cr} credits${bonus?` (${boss?'boss':'elite'} bonus)`:''} · +${perTurn()} energy`,'#ffd23f')};
    if(tier)openCache(tier,show);else show();
   }else if(R.lives>1&&!isBoss(R.wave)&&!isElite(R.wave)){ // a lost normal wave: −1 heart, no wave reward or cache, on to the next wave
-   R.lives--;bus.emit('life_lost',{left:R.lives,wave:R.wave});nextTurn();toast(`Wave lost · −1 ♥ · ${R.lives} left`,'#ff6b6b');
+   R.lives--;bus.emit('life_lost',{left:R.lives,wave:R.wave});
+   heartBreak(R.lives,()=>{nextTurn();heartLostPulse();toast(`Wave lost · −1 ♥ · ${R.lives} left`,'#ff6b6b')});
   }else finish(false);
  },900);
 }

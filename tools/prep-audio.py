@@ -35,6 +35,7 @@ CUTS = {
     'lose': (1.45, 0.1),
     'roll': (5.0, 0.3),
     'lever': (1.0, 0.2),
+    'heart': (1.0, 0.3),    # the crack when a heart is lost
     'click': (0.3, 0.05),   # menus
     'button': (0.3, 0.05),  # in-game buttons
 }
