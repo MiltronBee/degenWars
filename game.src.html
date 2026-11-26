@@ -339,6 +339,9 @@ h1,h2,h3,.disp{font-family:'Russo One','Chakra Petch',sans-serif;font-weight:400
 .proj{position:absolute;width:6px;height:6px;border-radius:50%;margin:-3px 0 0 -3px;background:currentColor;box-shadow:0 0 8px currentColor;z-index:99;pointer-events:none}
 .float{position:absolute;top:-10%;left:50%;transform:translateX(-50%);font-weight:700;font-size:15px;pointer-events:none;text-shadow:0 2px 0 #000,0 0 4px #000;animation:float .8s forwards;z-index:5;white-space:nowrap}
 @keyframes float{to{transform:translate(-50%,-30px);opacity:0}}
+.hearts{display:inline-flex;gap:1px;margin-left:6px;vertical-align:-1px;letter-spacing:0}
+.hearts i{font-style:normal;color:#e0503a;text-shadow:0 1px 0 #000,0 0 5px rgba(224,80,58,.55);font-size:12px}
+.hearts i.off{color:#4a3a30;text-shadow:0 1px 0 #000}
 /* settings: HUD gear, volume sliders, mute toggle */
 .hud-gear{flex:none;display:grid;place-items:center;width:34px;height:34px;padding:0;border-radius:8px;background:rgba(24,21,18,.9);border:1px solid #57472f;color:#d9a441;cursor:pointer;box-shadow:inset 0 1px 3px rgba(0,0,0,.65)}
 .hud-gear svg{width:20px;height:20px}
@@ -1206,7 +1209,7 @@ function uname(u){const g=u.gilded?'Gilded ':'',b=UNITS[u.type].n;if(u.lvl===1)r
 
 function freshRun(level,depth){
  return {level,depth,wave:1,turn:1,energy:BAL.econ.start+10*meta.up.start,credits:5,spinsUsed:0,nudges:1+meta.up.nudge,blasts:1,items:[],
-  cores:[],coreBag:[],sockBonus:0,spinRun:0,dry:0,runPaid:0,streak:0,rerolls:0,summonsTurn:0,freeSpin:false,peek:null,holdReel:null,stickyHold:false,holdUsed:0,stickyUsed:0,magnetTurn:0,chainTurn:0,gildedUsed:0,
+  cores:[],coreBag:[],sockBonus:0,spinRun:0,dry:0,runPaid:0,lives:BAL.lives,streak:0,rerolls:0,summonsTurn:0,freeSpin:false,peek:null,holdReel:null,stickyHold:false,holdUsed:0,stickyUsed:0,magnetTurn:0,chainTurn:0,gildedUsed:0,
   grid:Array.from({length:9},()=>randSym()),army:[],enemies:[],offers:[],sel:null,blast:false,toasts:[],phase:'manage',chain:0,heat:0}}
 function newRun(level,depth=pickDepth){
  meta.lastDepth=depth;saveMeta();
@@ -1239,7 +1242,9 @@ const BAL={
  eliteWave:[1,.95,.9],                             // elite-wave spike at waves 5/15/25
  lvlStep:1.08,
  ease:{k:.7,until:26},                              // level 1 only, a learning ramp: the curve starts at 70% of itself and is full by wave 26
- econ:{start:48,turn:30,wave:2,grow:1.5},           // run economy: start energy, income per turn (+wave·(w−1)), spin cost growth per spin in a turn
+ econ:{start:48,turn:25,wave:0,grow:1.5},           // run economy: start energy, income per turn (+wave·(w−1)), spin cost growth per spin in a turn
+ drop:{energy:2,elite:6,boss:15},                   // energy a killed enemy drops (owner: growth should be earned in battle, not handed out)
+ lives:3,                                           // hearts per run: a lost normal wave costs one and the run goes on; elite and boss waves are all or nothing
  threat:.017, tw:.09,
  n0:1, nPer:.55, nMax:9,
  elite:{hp:1.8,atk:1.3},                           // an elite vs a regular of the same wave
@@ -1422,6 +1427,9 @@ const FX=(()=>{
   g.fillStyle='rgba(92,72,56,.9)';g.font=`bold ${s*.42}px serif`;g.textAlign='center';g.textBaseline='middle';g.fillText('★',r,r+1);
   for(let i=0;i<18;i++){g.fillStyle=`rgba(48,49,47,${Math.random()*.35})`;g.fillRect(Math.random()*s,Math.random()*s,2,2)}});
  const puff=(c0,c1,mid)=>spr(64,(g,s)=>{const gr=g.createRadialGradient(s/2,s/2,0,s/2,s/2,s/2);gr.addColorStop(0,c0);if(mid)gr.addColorStop(.6,mid);gr.addColorStop(1,c1);g.fillStyle=gr;g.fillRect(0,0,s,s)});
+  const CELL=spr(48,(g,s)=>{const r=s/2,gr=g.createRadialGradient(r,r,1,r,r,r);gr.addColorStop(0,'rgba(255,246,190,.95)');gr.addColorStop(.45,'rgba(255,200,60,.5)');gr.addColorStop(1,'rgba(255,170,30,0)');
+  g.fillStyle=gr;g.fillRect(0,0,s,s);g.beginPath();[[.56,.1],[.27,.56],[.47,.56],[.39,.9],[.73,.42],[.53,.42],[.63,.1]].forEach(([x,y],i)=>i?g.lineTo(x*s,y*s):g.moveTo(x*s,y*s));
+  g.closePath();g.fillStyle='#fff3b0';g.strokeStyle='#7a4a08';g.lineWidth=2;g.fill();g.stroke()}); // energy cell: a glowing bolt
  const SMOKE=puff('rgba(48,49,47,.75)','rgba(48,49,47,0)','rgba(48,49,47,.3)'),DUST=puff('rgba(182,173,148,.6)','rgba(182,173,148,0)'),GLOW=puff('rgba(255,250,235,1)','rgba(255,150,50,0)','rgba(255,205,120,.55)');
  const P=[];let raf=0,lastT=0;
  function add(p){if(RM())return;if(P.length>380)P.shift();P.push(Object.assign({age:0,rot:0,vr:0,g:0,drag:1,vx:0,vy:0},p));if(!raf){lastT=performance.now();raf=requestAnimationFrame(step)}}
@@ -1433,7 +1441,7 @@ const FX=(()=>{
     p.x=p.hx+(p.tx-p.hx)*e;p.y=p.hy+(p.ty-p.hy)*e-Math.sin(q*Math.PI)*36;if(q>=1){P.splice(i,1);p.done&&p.done(p.v);continue}}
    if(p.type==='ring'){const e=1-Math.pow(1-k,3);ctx.globalAlpha=(1-k)*(p.a||1);ctx.strokeStyle=p.c;ctx.lineWidth=Math.max(.5,p.w*(1-k));ctx.beginPath();ctx.arc(p.x,p.y,p.r0+(p.r1-p.r0)*e,0,7);ctx.stroke()}
    else if(p.type==='glow'){const sz=p.s*(1+k*p.grow);ctx.globalCompositeOperation='lighter';ctx.globalAlpha=(1-k)*(1-k)*p.a;ctx.drawImage(GLOW,p.x-sz/2,p.y-sz/2,sz,sz);ctx.globalCompositeOperation='source-over'}
-   else if(p.type==='token'||p.type==='coin'){ctx.globalAlpha=k>.8?(1-k)*5:1;ctx.setTransform(DPR*Math.max(.08,Math.abs(Math.cos(p.rot))),0,0,DPR,p.x*DPR,p.y*DPR);ctx.drawImage(TOKEN,-p.s/2,-p.s/2,p.s,p.s);ctx.setTransform(DPR,0,0,DPR,0,0)}
+   else if(p.type==='token'||p.type==='coin'){ctx.globalAlpha=k>.8?(1-k)*5:1;ctx.setTransform(DPR*(p.cell?1:Math.max(.08,Math.abs(Math.cos(p.rot)))),0,0,DPR,p.x*DPR,p.y*DPR);ctx.drawImage(p.cell?CELL:TOKEN,-p.s/2,-p.s/2,p.s,p.s);ctx.setTransform(DPR,0,0,DPR,0,0)}
    else if(p.type==='spark'){ctx.globalAlpha=1-k;ctx.strokeStyle=k<.3?'#F0C080':'#D9772B';ctx.lineWidth=p.s;ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(p.x-p.vx*.035,p.y-p.vy*.035);ctx.stroke()}
    else if(p.type==='debris'){ctx.globalAlpha=k>.7?(1-k)/.3:1;ctx.fillStyle=p.c;ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.rot);ctx.fillRect(-p.s/2,-p.s/3,p.s,p.s*.66);ctx.restore()}
    else{const sz=p.s*(1+k*p.grow);ctx.globalAlpha=(1-k)*p.a;ctx.drawImage(p.type==='smoke'?SMOKE:DUST,p.x-sz/2,p.y-sz/2,sz,sz)}}
@@ -1451,8 +1459,8 @@ const FX=(()=>{
  // death blast: flash, shock ring, then the existing sparks/smoke/debris
  const boom=(x,y,s=1)=>{add({type:'glow',x,y,s:110*s,grow:.8,a:1,life:.24*s});add({type:'ring',x,y,r0:8,r1:80*s,w:6,c:'#ffd9a0',life:.4});explode(x,y)};
  // n coins burst from (x,y) and fly to (tx,ty); done(value) runs as each one lands. Without motion they pay at once.
- const collect=(x,y,vals,tx,ty,done)=>{if(RM()){vals.forEach(v=>done(v));return}
-  vals.forEach((v,i)=>{const a=rr(-Math.PI*.85,-Math.PI*.15),sp=rr(220,420);add({type:'coin',x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,g:1400,s:rr(13,17),vr:rr(8,18),drag:.99,
+ const collect=(x,y,vals,tx,ty,done,kind='coin')=>{if(RM()){vals.forEach(v=>done(v));return}const cell=kind==='cell';
+  vals.forEach((v,i)=>{const a=rr(-Math.PI*.85,-Math.PI*.15),sp=rr(220,420);add({type:'coin',cell,x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,g:1400,s:cell?rr(18,24):rr(13,17),vr:rr(8,18),drag:.99,
    t1:rr(.32,.42)+i*.05,t2:rr(.42,.55),life:9,tx,ty,v,done})})};
  return {tokens,sparks,smoke,dust,explode,hit,boom,collect};
 })();
@@ -2229,7 +2237,7 @@ function startBattle(){
  for(const f of P){const t=f.u&&f.u.type;
   if(t==='commander'){play(sheetOf(f),'rally',{once:1});setTimeout(()=>floatTxt(f,'RALLY!','#b78cff'),250)}
   if(t==='hacker')play(sheetOf(f),'deploy',{once:1})}
- let last=performance.now();crShown=R.credits;
+ let last=performance.now();crShown=R.credits;shownEnergy=R.energy; // the HUD counters count up from here as coins and cells land
  const loop=now=>{if(!F)return;if(now<HS.until){last=now;return requestAnimationFrame(loop)} // hitstop: the fight holds
   const dt=Math.min(50,now-last)*speed;last=now;
   const res=battleTick(dt);drawFighters();
@@ -2284,6 +2292,8 @@ function hurt(a,raw,side,src,big){
  // Lancer shield wall: ranged fire on an ally standing just behind a Lancer is cut by 40%
  if(a.side==='P'&&src&&src.rng>12&&!a.shield&&!a.fly&&alive(F.P).some(L=>L.shield&&L.x>a.x&&L.x-a.x<14&&Math.abs(L.y-a.y)<8)){raw*=.6;floatTxt(a,'BLOCK','#ffc23d')}
  const was=a.hp,dmg=Math.max(1,Math.round(raw*(.9+Math.random()*.2)));a.hp=Math.max(0,a.hp-dmg);
+ // a killed enemy drops energy (live and sim alike); a.drop keeps what actually fit under the bank cap, for the cells' flight
+ if(a.side==='E'&&was>0&&a.hp<=0){const e=a.boss?BAL.drop.boss:a.elite?BAL.drop.elite:BAL.drop.energy;a.drop=Math.max(0,Math.min(e,bankCap()-R.energy));R.energy+=a.drop}
  // enemies on screen get the full hit feedback; the headless sim (no elements) and our own units keep the light version
  if(a.side==='E'&&a.el&&!F.sim)hitFx(a,dmg,src,big,was>0&&a.hp<=0);
  else{floatTxt(a,'-'+dmg,side==='P'?'#ffd23f':'#ff6b85');fx(a,'hit')}
@@ -2333,7 +2343,7 @@ function enemyDeath(a,dir,big,b){const e=a.el;
  e.classList.add('flung');
  const boom=()=>{const c=rc(b);e.classList.add('gone');FX.boom(c.x,c.y,a.boss?1.8:1);
   SFX.play('explode',{vol:a.boss?1:.7,rate:a.boss?.75:1});camShake(a.boss?.95:big?.45:.25);if(a.boss)flashScreen(.35,300);
-  dropCredits(c.x,c.y,share)};
+  dropCredits(c.x,c.y,share);dropEnergy(c.x,c.y,a.drop||0)};
  if(RM())return boom();
  const L=a.boss?1.25:1,fr=$('#field').getBoundingClientRect(),br=b.getBoundingClientRect(),cx=br.left+br.width/2,cy=br.top+br.height/2;
  const side=dir*Math.max(0,Math.min(br.width*.9*L,dir>0?fr.right-30-cx:cx-fr.left-30)),up=Math.max(0,Math.min(br.height*1.1*L,cy-fr.top-50));
@@ -2346,6 +2356,11 @@ function dropCredits(x,y,v){if(!v)return;
  const n=Math.min(v,6),vals=Array.from({length:n},(_,i)=>Math.floor(v/n)+(i<v%n?1:0));
  if(!tgt){FX.tokens(x,y,n,.7);showCredits(crShown=Math.min(R.credits,crShown+v));return}
  FX.collect(x,y,vals,tgt.left+tgt.width/2,tgt.top+tgt.height/2,val=>{showCredits(crShown=Math.min(R.credits,crShown+val));SFX.play('coin',{vol:.35,vary:.1})})}
+// energy cells fly to the HUD energy counter, which counts up as they land (R.energy was paid at the kill)
+function dropEnergy(x,y,v){if(!v)return;const el=$('#hudEnergy svg')||$('#hudEnergy'),r=el&&el.getBoundingClientRect();
+ const n=Math.min(v,5),vals=Array.from({length:n},(_,i)=>Math.floor(v/n)+(i<v%n?1:0));
+ if(!r||!r.width){tweenEnergy(R.energy);renderEbar();return}
+ FX.collect(x,y,vals,r.left+r.width/2,r.top+r.height/2,val=>{tweenEnergy(Math.min(R.energy,(shownEnergy??R.energy)+val));renderEbar();SFX.play('coin',{vol:.22,rate:1.35})},'cell')}
 function showCredits(c){const h=$('#hudCredits b'),a=$('#shop small'),b=$('#shop2c');if(h)h.textContent=c;if(a)a.textContent=c+'c';if(b)b.textContent=c+' credits';
  const el=h?$('#hudCredits'):a?.closest('button')||b?.closest('button');if(el&&!RM())el.animate([{transform:'scale(1)'},{transform:'scale(1.14)',filter:'brightness(1.5)'},{transform:'scale(1)'}],{duration:200})}
 function separate(arr){const l=alive(arr).filter(f=>!f.orb||f.out);
@@ -2378,6 +2393,8 @@ function endWave(won){
    // no "wave cleared" screen (owner: distracting): roll straight into the next turn; the reward shows as a toast
    const tier=dropTier(R.wave),boss=isBoss(R.wave),show=()=>{closeModal();nextTurn();toast(`${boss?'Boss down · ':''}+${cr} credits${bonus?` (${boss?'boss':'elite'} bonus)`:''} · +${perTurn()} energy`,'#ffd23f')};
    if(tier)openCache(tier,show);else show();
+  }else if(R.lives>1&&!isBoss(R.wave)&&!isElite(R.wave)){ // a lost normal wave: −1 heart, no wave reward or cache, on to the next wave
+   R.lives--;bus.emit('life_lost',{left:R.lives,wave:R.wave});nextTurn();toast(`Wave lost · −1 ♥ · ${R.lives} left`,'#ff6b6b');
   }else finish(false);
  },900);
 }
@@ -2507,7 +2524,7 @@ const SIM={dt:40,lines:0,novice:false};
 function simRun(level,depth){
  R=freshRun(level,depth);makeWave();rollShop();const log=[];
  for(;;){simManage();const pw=simPower(),b=simBattle();log.push({w:R.wave,won:b.won,hp:b.hp,pw,army:R.army.length});
-  if(!b.won)return {died:R.wave,log};
+  if(!b.won){if(R.lives>1&&!isBoss(R.wave)&&!isElite(R.wave)){R.lives--;turnAdvance();makeWave();rollShop();continue}return {died:R.wave,log}}
   R.credits+=waveCredits(R.wave);if(R.wave>=R.depth)return {died:0,log};
   const tier=dropTier(R.wave);if(tier)simCache(tier);
   turnAdvance();makeWave();rollShop()}}
@@ -2726,7 +2743,7 @@ function renderField(){
   units=R.army.map(u=>{const tgt=s&&u!==s&&u.type===s.type&&u.lvl===s.lvl&&u.lvl<3;return fu({id:u.id,k:u.type,aura:UNITS[u.type].aura,spr:'',lvl:u.lvl,x:u.x,y:u.y,pct:100,cls:(u===s?'sel':tgt?'target':'')+(u.gilded?' gild':'')})}).join('');
   if(s){const st=stats(s);info=`<div class="grow"><b>${uname(s)}</b> <span class="mute">Lv${s.lvl}</span><div class="mute">${s.gilded?'<b style="color:#f6d987;font-size:12px">GILDED +25%</b> · ':''}${s.rally?'<b style="color:#8fd0c8;font-size:12px">RALLY +10%</b> · ':''}${st.maxHp} HP · ${st.atk} dmg${st.heal?` · heals ${st.heal}`:''} · every ${(st.cd/1000).toFixed(1)}s · range ${UMOVE[s.type].rng>12?'long':'melee'}</div><div class="mute">${UNITS[s.type].tip}</div><div class="mute">Tap your side of the field to move it${s.lvl<3?`, or a glowing Lv${s.lvl} ${UNITS[s.type].n} to merge`:''}.</div></div><button class="btn speed" id="scrap">Scrap +2c</button>`}
   else{const intel=R.army.some(u=>u.type==='hacker')?Object.entries(R.enemies.reduce((m,e)=>(m[e.n]=(m[e.n]||0)+1,m),{})).map(([n,c])=>`${c} ${n}`).join(' · '):'';
-   info=`<div class="grow"><b>Army ${army().length}/${cap()}</b>${overCap()?`<div class="intel" style="color:#ff8a6b">Over the limit: merge or scrap ${army().length-cap()} to spin again. You can still fight.</div>`:''}<div class="mute">${army().length?'Tap a unit, then tap the field to reposition it. Tap two matching units to merge.':'Spin the Summoner. Three in a row deploys a unit here.'}</div>${intel?`<div class="intel">Scout orb intel: ${intel}</div>`:''}</div>`}}
+   info=`<div class="grow"><b>Army ${army().length}/${cap()}</b>${overCap()?`<div class="intel" style="color:#ff8a6b">Over the limit: merge or scrap ${army().length-cap()} to spin again. You can still fight.</div>`:''}${isBoss(R.wave)||isElite(R.wave)?`<div class="intel" style="color:#ff8a6b">${isBoss(R.wave)?'Boss':'Elite'} wave: losing it ends the run, hearts or not.</div>`:''}<div class="mute">${army().length?'Tap a unit, then tap the field to reposition it. Tap two matching units to merge.':'Spin the Summoner. Three in a row deploys a unit here.'}</div>${intel?`<div class="intel">Scout orb intel: ${intel}</div>`:''}</div>`}}
  $('.fieldcol').innerHTML=`<div class="fwrap">
   <div class="fbox"><div class="field ${!battle&&R.sel!==null?'placing':''}" id="field"><svg class="terrain" viewBox="0 0 100 60" preserveAspectRatio="xMidYMid slice">${TERRAIN}</svg><div class="paint"></div><svg class="gplane" id="gplane" preserveAspectRatio="none"></svg><div class="zone"><span class="zlabel">Your side</span></div><span class="elabel">${th.n} · Lv${R.level}</span><div class="fhead ribbon">${trackHTML(battle)}</div>${bossBar}${battle
       ?`<div class="ucount"><div><b id="ucP">${F.P.filter(f=>f.hp>0&&!f.orb).length}/${F.P.filter(f=>!f.orb).length}</b><small>YOURS</small></div><span class="sep"></span><div class="foe"><b id="ucE">${F.E.filter(f=>f.hp>0&&f.seen).length}</b><small>ENEMIES</small></div></div>`
@@ -2746,7 +2763,8 @@ function trackHTML(battle){const N=R.depth,w=R.wave;let o='';
  for(let i=1;i<=N;i++){const k=isBoss(i)?'boss':isElite(i)?'elite':'',st=i<w?'done':i===w?'now':'';
   o+=`<i class="tn ${k} ${st}" style="left:${((i-.5)/N*100).toFixed(2)}%" title="Wave ${i}${k==='boss'?' · Boss':k==='elite'?' · Elite wave':''}">${i===w?`<b>${i}</b>`:k==='boss'&&N>10?`<em>${i}</em>`:''}</i>`}
  const nb=Math.ceil(w/10)*10,next=isBoss(w)?'Boss wave!':isElite(w)?'Elite wave':`Boss in ${nb-w}`;
- return `<div class="track"><div class="tlab"><span>Incursion</span><b>${w}<small>/${N}</small></b></div><div class="rail"><div class="fill" style="width:${((w-1)/N*100).toFixed(2)}%"></div>${o}</div><div class="tnext ${isBoss(w)?'hot':''}">${battle?'Engaged · ':''}${next}</div></div>`}
+ const hearts=`<span class="hearts" title="Hearts: losing a normal wave costs one and the run goes on. Losing an elite or boss wave ends the run.">${Array.from({length:BAL.lives},(_,k)=>`<i class="${k<R.lives?'':'off'}">♥</i>`).join('')}</span>`;
+ return `<div class="track"><div class="tlab"><span>Incursion ${hearts}</span><b>${w}<small>/${N}</small></b></div><div class="rail"><div class="fill" style="width:${((w-1)/N*100).toFixed(2)}%"></div>${o}</div><div class="tnext ${isBoss(w)?'hot':''}">${battle?'Engaged · ':''}${next}</div></div>`}
 function renderHome(){
  $('#app').classList.remove('ingame');
  const lv=Array.from({length:meta.maxLevel},(_,k)=>k+1);
@@ -2759,7 +2777,7 @@ function renderHome(){
   <button class="btn gold spinbtn" id="go" style="width:100%">DEPLOY</button>
   <button class="btn cx-open" id="homeCodex" style="width:100%;margin-top:10px;font-family:'Russo One';font-size:18px">CODEX <small id="cxPct" style="font-family:'Chakra Petch';font-size:13px;color:var(--mute)"></small><span data-codex-badge hidden></span></button>
   <button class="btn" id="homeSet" style="width:100%;margin-top:10px;font-family:'Russo One';font-size:18px">SETTINGS</button>
-  <ul class="how"><li><b>Spin</b> costs energy and each spin in a turn costs 50% more. Unspent energy carries over.</li><li><b>3 in a row</b> on any of 8 lines summons that unit. Lines pay again after a nudge or blast.</li><li><b>Nudge</b> drops a reel one step. <b>Blast</b> clears a symbol and new ones fall in.</li><li><b>Merge</b> two equal units to level up and pick a class.</li><li>An <b>incursion</b> pushes 10, 20 or 30 waves deep. Bosses guard every 10th wave, elites every 5th. You won't see the enemy until you hit <b>Battle!</b> Losing a wave ends the run.</li></ul></div>
+  <ul class="how"><li><b>Spin</b> costs energy and each spin in a turn costs 50% more. Unspent energy carries over.</li><li><b>3 in a row</b> on any of 8 lines summons that unit. Lines pay again after a nudge or blast.</li><li><b>Nudge</b> drops a reel one step. <b>Blast</b> clears a symbol and new ones fall in.</li><li><b>Merge</b> two equal units to level up and pick a class.</li><li>An <b>incursion</b> pushes 10, 20 or 30 waves deep. Bosses guard every 10th wave, elites every 5th. You won't see the enemy until you hit <b>Battle!</b> You have 3 hearts: losing a normal wave costs one and the run goes on. Losing an elite or boss wave ends the run.</li></ul></div>
   <div class="panel parts"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h2 style="font-size:22px">Upgrades</h2><span class="stat"><span class="dot" style="background:var(--blue)"></span>${meta.chips} <i>chips</i></span></div>
   <div class="opts">${UPS.map(u=>{const n=meta.up[u.id],max=u.costs.length,c=u.costs[n];return `<button class="opt" data-u="${u.id}" ${n<max&&meta.chips>=c?'':'disabled'}><span class="grow"><b>${u.n}</b><span class="pips">${u.costs.map((_,k)=>`<i class="${k<n?'f':''}"></i>`).join('')}</span><small>${u.d}</small></span><span class="price">${n<max?c+' chips':'MAX'}</span></button>`}).join('')}</div>
   <p style="color:var(--mute);font-size:13px;margin:12px 0 0">Army ${cap()} units · ${3+meta.up.spins} spins/turn · ${25+5*meta.up.energy} energy/turn · ${2+meta.up.slots} item slots · ${1+meta.up.cores} core socket${meta.up.cores?'s':''} · each upgrade level adds ${(BAL.threat*100).toFixed(1)}% threat</p></div></div>`;
