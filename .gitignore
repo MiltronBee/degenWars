@@ -18,3 +18,5 @@ docs/ref/
 .env
 # full-res Gemini art originals (the game uses the webp copies in art/)
 tools/.src/
+# original music masters (heavy WAV/MP3): only the game copies in audio/music/ are committed
+audio/src/music/

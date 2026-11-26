@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prepare the game sounds: audio/src/<name>.mp3 -> audio/<name>.mp3 (the files the game loads).
+"""Prepare the game sounds: audio/src/<name>.(mp3|wav|ogg) -> audio/<name>.mp3 (the files the game loads).
 
 For each sound in CUTS:
   1. cut the silence before the onset (a hit that starts 80 ms late feels like lag),
@@ -26,6 +26,8 @@ CUTS = {
     'lose': (1.45, 0.1),
     'roll': (5.0, 0.3),
     'lever': (1.0, 0.2),
+    'click': (0.3, 0.05),   # menus
+    'button': (0.3, 0.05),  # in-game buttons
 }
 
 
@@ -47,8 +49,8 @@ def levels(f):
 
 trims = {}
 for name, (length, fade) in CUTS.items():
-    src = SRC / f'{name}.mp3'
-    if not src.exists():
+    src = next((SRC / f'{name}.{ext}' for ext in ('mp3', 'wav', 'ogg') if (SRC / f'{name}.{ext}').exists()), None)
+    if not src:
         continue
     on = onset(src)
     cut = f'atrim=start={on:.3f}:duration={length},asetpts=PTS-STARTPTS,afade=t=out:st={max(0, length - fade):.3f}:d={fade}'

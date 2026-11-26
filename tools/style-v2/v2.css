@@ -280,7 +280,7 @@ b,strong{font-weight:700}
 .parts .opt small{color:#bdbfb6}
 .parts .opt .price{color:var(--carbon);background:var(--ochre);border-radius:var(--r1);padding:2px 6px}
 .parts .opt:disabled{opacity:.6;filter:none}
-#homeCodex{font-family:var(--f-disp)!important;font-weight:400!important;letter-spacing:.1em}
+#homeCodex,#homeSet{font-family:var(--f-disp)!important;font-weight:400!important;letter-spacing:.1em}
 #homeCodex small{font-family:var(--f-ui)!important;letter-spacing:.04em}
 #go{font-size:var(--t-xl);min-height:56px}
 

@@ -339,6 +339,21 @@ h1,h2,h3,.disp{font-family:var(--f-disp);font-weight:400;letter-spacing:.01em;ma
 .proj{position:absolute;width:6px;height:6px;border-radius:50%;margin:-3px 0 0 -3px;background:currentColor;box-shadow:0 0 8px currentColor;z-index:99;pointer-events:none}
 .float{position:absolute;top:-10%;left:50%;transform:translateX(-50%);font-weight:700;font-size:15px;pointer-events:none;text-shadow:0 2px 0 #000,0 0 4px #000;animation:float .8s forwards;z-index:5;white-space:nowrap}
 @keyframes float{to{transform:translate(-50%,-30px);opacity:0}}
+/* settings: HUD gear, volume sliders, mute toggle */
+.hud-gear{flex:none;display:grid;place-items:center;width:34px;height:34px;padding:0;border-radius:8px;background:rgba(24,21,18,.9);border:1px solid #57472f;color:#d9a441;cursor:pointer;box-shadow:inset 0 1px 3px rgba(0,0,0,.65)}
+.hud-gear svg{width:20px;height:20px}
+.hud-gear:hover,.hud-gear:focus-visible{color:#f6e2a0;border-color:#8a6a3a}
+.vol{display:grid;grid-template-columns:92px 1fr 34px;align-items:center;gap:12px;margin:14px 2px}
+.vol>span{font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#e8d3a8}
+.vol>b{font:700 17px/1 var(--f-num);color:var(--gold);text-align:right;font-variant-numeric:tabular-nums}
+.vol>small{grid-column:2/4;margin-top:-8px;font-size:11px;color:var(--mute)}
+.slider{-webkit-appearance:none;appearance:none;width:100%;height:8px;margin:0;border-radius:5px;cursor:pointer;background:linear-gradient(90deg,#6e5226,#c9a23a) 0 0/var(--p,50%) 100% no-repeat,#120d09;box-shadow:inset 0 1px 2px #000,0 0 0 1px #5a4429}
+.slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:22px;height:22px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#f6e2a0,#c9a23a 55%,#6e5226);border:1px solid #2a1c0c;box-shadow:0 2px 5px rgba(0,0,0,.6)}
+.slider::-moz-range-thumb{width:22px;height:22px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#f6e2a0,#c9a23a 55%,#6e5226);border:1px solid #2a1c0c;box-shadow:0 2px 5px rgba(0,0,0,.6)}
+.slider:focus-visible{outline:2px solid var(--gold);outline-offset:5px}
+.tog{display:flex;align-items:center;gap:10px;margin:16px 2px 0;font-size:14px;color:#e8d3a8;cursor:pointer}
+.tog input{width:18px;height:18px;margin:0;accent-color:#c9a23a}
+@media(max-width:979px){.wrap.ingame .hg-lvl .lvtag{display:none}.hud-gear{width:30px;height:30px}.hud-gear svg{width:18px;height:18px}}
 /* enemy hit feedback: damage numbers, flung corpses, camera shake (world layers only; HUD and ribbons stay put) */
 #field>:is(.terrain,.paint,.gplane,.zone,.elabel,.fu,.proj,.dmg){translate:var(--shx,0) var(--shy,0)}
 .dmg{position:absolute;z-index:960;pointer-events:none;white-space:nowrap;font-family:var(--f-num);font-weight:700;line-height:1;color:#fff1cf;transform:translate(-50%,-50%);
@@ -1255,7 +1270,7 @@ b,strong{font-weight:700}
 .parts .opt small{color:#bdbfb6}
 .parts .opt .price{color:var(--carbon);background:var(--ochre);border-radius:var(--r1);padding:2px 6px}
 .parts .opt:disabled{opacity:.6;filter:none}
-#homeCodex{font-family:var(--f-disp)!important;font-weight:400!important;letter-spacing:.1em}
+#homeCodex,#homeSet{font-family:var(--f-disp)!important;font-weight:400!important;letter-spacing:.1em}
 #homeCodex small{font-family:var(--f-ui)!important;letter-spacing:.04em}
 #go{font-size:var(--t-xl);min-height:56px}
 
@@ -1743,23 +1758,46 @@ const bus={h:{},log:[],
  emit(e,d={}){this.log.push({e,d,t:Math.round(performance.now())});if(this.log.length>60)this.log.shift();
   (this.h[e]||[]).slice().forEach(f=>{try{f(d)}catch(err){console.warn(err)}});(this.h['*']||[]).slice().forEach(f=>{try{f(e,d)}catch(err){console.warn(err)}})}};
 window.degenCues=bus;
+// ---- sound settings: a master volume plus one volume per category (0-100), saved in this browser ----
+const SET_KEY='degenWars.settings.v1';
+const settings=Object.assign({master:90,music:70,sfx:100,ui:100,mute:false},(()=>{try{return JSON.parse(localStorage.getItem(SET_KEY))||{}}catch(e){return {}}})());
+const saveSettings=()=>{try{localStorage.setItem(SET_KEY,JSON.stringify(settings))}catch(e){}};
 // ---- sound: Web Audio one-shots driven by the cue bus. Each file is decoded once (low latency on phones).
 // The context starts suspended until the first touch/key (browser autoplay rule).
 // Files live in audio/<name>.mp3. Until a file exists, hit/crit/explode/coin play a synthesized stand-in; lever stays silent.
-const SFX={ctx:null,buf:{},nz:{},vol:.8,last:{},gap:{hit:45,crit:60,explode:50,coin:40}, // gap: min ms between two plays of one sound
- trim:{hit:1.34,coin:1.47,win:1.19,roll:1.09}, // per-file lift to one loudness: printed by tools/prep-audio.py (re-run it after changing audio/src)
+// Every sound has a category (SFX.cat, unlisted = sfx). Each category is a gain bus under the master bus:
+//   music: looped tracks from audio/music/<name>.mp3 (SFX.music)  ·  sfx: game sounds  ·  ui: interface sounds (none yet)
+const SFX={ctx:null,buf:{},nz:{},bus:{},track:null,last:{},gap:{hit:45,crit:60,explode:50,coin:40,click:40,button:40}, // gap: min ms between two plays of one sound
+ cat:{lever:'sfx',roll:'sfx',win:'sfx',lose:'sfx',hit:'sfx',crit:'sfx',explode:'sfx',coin:'sfx',click:'ui',button:'ui'},
+ CATS:[['music','Music'],['sfx','Effects'],['ui','Interface']], // category id, settings label
+ trim:{hit:1.34,coin:1.47,win:1.19,roll:1.09,button:1.4}, // per-file lift to one loudness: printed by tools/prep-audio.py (re-run it after changing audio/src)
  loops:{roll:[.5,4.6]}, // loop range in s inside the steady part, only reached by very long spins
- init(){if(this.ctx)return this.ctx;const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return null;try{this.ctx=new AC()}catch(e){}return this.ctx},
+ init(){if(this.ctx)return this.ctx;const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return null;try{this.ctx=new AC()}catch(e){return null}
+  const c=this.ctx;this.bus.master=c.createGain();this.bus.master.connect(c.destination);
+  for(const [k] of this.CATS){this.bus[k]=c.createGain();this.bus[k].connect(this.bus.master)}
+  this.apply(true);return c},
+ // settings -> bus gains. Sliders run 0-100 on a squared curve so each step sounds about as big as the last.
+ apply(now){const c=this.ctx;if(!c)return;const G=v=>Math.pow(Math.max(0,Math.min(100,+v||0))/100,2);
+  const set=(n,v)=>{if(now||c.state!=='running'){n.gain.cancelScheduledValues(0);n.gain.value=v}else n.gain.setTargetAtTime(v,c.currentTime,.03)}; // a paused clock never reaches a ramp
+  set(this.bus.master,settings.mute?0:G(settings.master));for(const [k] of this.CATS)set(this.bus[k],G(settings[k]))},
+ out(name){return this.bus[this.cat[name]||'sfx']},
+ // music(name): loop audio/music/<name>.mp3 on the music bus, cross-fading from the current track; music(null) fades out
+ music(name,fade=1.5){const c=this.init();if(!c)return;const old=this.track;if(old&&old.name===name)return;
+  if(old){old.g.gain.setTargetAtTime(0,c.currentTime,fade/4);setTimeout(()=>{old.el.pause();old.g.disconnect()},fade*1000+300)}
+  this.track=null;if(!name)return;
+  const el=new Audio(`audio/music/${name}.mp3`),g=c.createGain();el.loop=true;g.gain.value=0;
+  c.createMediaElementSource(el).connect(g).connect(this.bus.music);g.gain.setTargetAtTime(1,c.currentTime,fade/4);
+  el.play().catch(()=>{});this.track={name,el,g}}, // blocked before the first tap: the gesture listener below retries
  async load(name,url){const c=this.init();if(!c)return;try{const r=await fetch(url);if(!r.ok)return;this.buf[name]=await c.decodeAudioData(await r.arrayBuffer())}catch(e){}},
  // vary: every play nudges the pitch by up to ±vary (6% by default) so repeats never sound identical
  play(name,{vol=1,rate=1,vary=.06,loop=false}={}){const c=this.ctx;if(!c)return null;const now=performance.now();if(now-(this.last[name]||0)<(this.gap[name]||0))return null;this.last[name]=now;
   if(c.state==='suspended')c.resume();rate*=1+(Math.random()*2-1)*vary;
   let b=this.buf[name];if(!b&&name==='crit'&&this.buf.hit){b=this.buf.hit;rate*=.8;vol*=1.2} // a crit without its own file: the hit, deeper and louder
   if(!b)return loop?null:this.synth(name,vol,rate);
-  const s=c.createBufferSource(),g=c.createGain();s.buffer=b;s.loop=loop;if(loop&&this.loops[name]){[s.loopStart,s.loopEnd]=this.loops[name]}s.playbackRate.value=rate;g.gain.value=this.vol*(this.trim[name]||1)*vol;s.connect(g).connect(c.destination);s.start();
+  const s=c.createBufferSource(),g=c.createGain();s.buffer=b;s.loop=loop;if(loop&&this.loops[name]){[s.loopStart,s.loopEnd]=this.loops[name]}s.playbackRate.value=rate;g.gain.value=(this.trim[name]||1)*vol;s.connect(g).connect(this.out(name));s.start();
   // stop(ms): fade out over ms, then stop (used to cut the reel roll when the last reel lands)
   return {s,g,stop(ms=120){const t=c.currentTime;try{g.gain.cancelScheduledValues(t);g.gain.setValueAtTime(g.gain.value,t);g.gain.linearRampToValueAtTime(0,t+ms/1000);s.stop(t+ms/1000+.02)}catch(e){}}}},
- synth(name,vol,rate){const c=this.ctx,t=c.currentTime,out=c.createGain();out.gain.value=this.vol*vol;out.connect(c.destination);
+ synth(name,vol,rate){const c=this.ctx,t=c.currentTime,out=c.createGain();out.gain.value=vol;out.connect(this.out(name));
   const env=(node,peak,dur,at=0)=>{const g=c.createGain();g.gain.setValueAtTime(peak,t+at);g.gain.exponentialRampToValueAtTime(.001,t+at+dur);node.connect(g).connect(out)};
   const tone=(type,f0,f1,dur,peak,at=0)=>{const o=c.createOscillator();o.type=type;o.frequency.setValueAtTime(f0*rate,t+at);o.frequency.exponentialRampToValueAtTime(f1*rate,t+at+dur);env(o,peak,dur,at);o.start(t+at);o.stop(t+at+dur+.02)};
   const hiss=(f,q,dur,peak,type='bandpass')=>{let nb=this.nz[dur];if(!nb){nb=this.nz[dur]=c.createBuffer(1,Math.ceil(c.sampleRate*dur),c.sampleRate);const d=nb.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1}
@@ -1771,8 +1809,8 @@ const SFX={ctx:null,buf:{},nz:{},vol:.8,last:{},gap:{hit:45,crit:60,explode:50,c
   else{out.disconnect();return null}
   return {out}}};
 window.degenSfx=SFX;
-['pointerdown','keydown'].forEach(ev=>addEventListener(ev,()=>{const c=SFX.init();if(c&&c.state==='suspended')c.resume()},{capture:true,passive:true}));
-['lever','roll','win','lose','hit','crit','explode','coin'].forEach(n=>SFX.load(n,`audio/${n}.mp3`));
+['pointerdown','keydown'].forEach(ev=>addEventListener(ev,()=>{const c=SFX.init();if(c&&c.state==='suspended')c.resume();if(SFX.track&&SFX.track.el.paused)SFX.track.el.play().catch(()=>{})},{capture:true,passive:true}));
+['lever','roll','win','lose','hit','crit','explode','coin','click','button'].forEach(n=>SFX.load(n,`audio/${n}.mp3`));
 bus.on('lever_release',d=>SFX.play('lever',{vol:.75+.25*(d.power||0)})); // harder pull = louder slam
 // the reels roll from the pull until the last reel lands (tease and slam-stop included: both just move that last stop)
 let rollSnd=null;const stopRoll=(ms=140)=>{if(rollSnd){rollSnd.stop(ms);rollSnd=null}};
@@ -2715,7 +2753,7 @@ function hitFx(a,dmg,src,big,killed){const b=a.el.querySelector('.body');if(!b)r
  if(big)hitstop(a.boss?110:85); // first, so the effects below keep playing while the world holds
  b.animate([{filter:WHITE},{filter:WHITE}],{duration:80});
  const c=rc(b);FX.hit(c.x+dir*c.w*.12,c.y-c.h*.05,dir>0?0:Math.PI,big);
- SFX.play(big?'crit':'hit',{vol:big?1:.55,vary:.1});
+ SFX.play(big?'crit':'hit',{vol:big?.6:.32,vary:.1}); // hits fire constantly: kept low (owner found them loud)
  dmgNum(a,dmg,dir,big,b);
  if(big)camShake(.55);
  if(killed)return enemyDeath(a,dir,big,b);
@@ -2959,6 +2997,7 @@ const IC=(()=>{const v=(p,f)=>`<svg viewBox="0 0 24 24" aria-hidden="true" fill=
   shop:v('<path d="M5 8h14l-1.2 12.5H6.2z"/><path d="M9 10V6.5a3 3 0 0 1 6 0V10"/>'),
   parts:v('<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/><circle cx="12" cy="12" r="6.5"/>'),
   speed:v('<path d="M4 6l7 6-7 6zM13 6l7 6-7 6z"/>',1),
+  gear:v((()=>{const P=(r,t)=>`${(12+r*Math.cos(t)).toFixed(2)} ${(12+r*Math.sin(t)).toFixed(2)}`;let d='';for(let i=0;i<8;i++){const t=i*Math.PI/4;d+=`${i?'L':'M'}${P(7,t-.33)}L${P(9.8,t-.2)}L${P(9.8,t+.2)}L${P(7,t+.33)}`}return `<path d="${d}Z"/><circle cx="12" cy="12" r="3"/>`})()),
   field:v('<path d="M2.5 19.5 9 9l4 6 3-4 5.5 8.5z"/><circle cx="17" cy="6" r="2"/>'),
   slot:v('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M15 4v16M3 12h18"/>'),
   swords:v('<path d="M4 4l10.5 10.5M20 4 9.5 14.5"/><path d="M4 4h3.5L17 13.5M20 4h-3.5L7 13.5"/><path d="M13 16l5 5M11 16l-5 5M15.5 13.5l-3 3M8.5 13.5l3 3"/>')}})();
@@ -3012,12 +3051,31 @@ function openParts(){let sel=null;
 
 function modal(html,init){$('#ovl').innerHTML=`<div class="ov"><div class="modal">${html}</div></div>`;init&&init($('#ovl .modal'))}
 function closeModal(){$('#ovl').innerHTML=''}
+// ---- settings: sound volumes (master + one slider per category that has sounds; music always) and mute ----
+function openSettings(){
+ const used=new Set(Object.values(SFX.cat));used.add('music');
+ const row=(k,label,note)=>`<label class="vol"><span>${label}</span><input type="range" class="slider" min="0" max="100" step="1" value="${settings[k]}" data-k="${k}" aria-label="${label} volume"><b>${settings[k]}</b>${note?`<small>${note}</small>`:''}</label>`;
+ modal(`<h2>Settings</h2><div class="plabel"><span>Sound</span></div>${row('master','Master')}
+  ${SFX.CATS.filter(([k])=>used.has(k)).map(([k,n])=>row(k,n,k==='music'&&!SFX.track?'No music playing yet':'')).join('')}
+  <label class="tog"><input type="checkbox" id="setMute" ${settings.mute?'checked':''}><span>Mute all sound</span></label>
+  <div class="mrow"><button class="btn gold" id="setOk">Done</button></div>`,m=>{
+  const paint=i=>{i.style.setProperty('--p',i.value+'%');i.nextElementSibling.textContent=i.value};
+  m.querySelectorAll('.slider').forEach(i=>{paint(i);
+   i.oninput=()=>{settings[i.dataset.k]=+i.value;paint(i);SFX.apply()};
+   i.onchange=()=>{saveSettings();if(i.dataset.k!=='music')SFX.play('coin',{vol:.8})}}); // let go: a sample at the new level
+  m.querySelector('#setMute').onchange=e=>{settings.mute=e.target.checked;SFX.apply();saveSettings()};
+  m.querySelector('#setOk').onclick=closeModal})}
+document.addEventListener('click',e=>{if(e.target.closest('#hudSet,#homeSet'))openSettings()});
+// UI clicks (category ui): menus (home screen, dialogs, shop, codex) play 'click', in-game controls play 'button'.
+// Left out: the lever and SPIN (the pull has its own sounds) and disabled buttons (they get no click event at all).
+document.addEventListener('click',e=>{const el=e.target.closest('button,[role=button],label.tog');if(!el||el.disabled||el.matches('#lever,#spin'))return;
+ SFX.play(view!=='game'||el.closest('#ovl,#codex,[role=dialog]')?'click':'button',{vol:.45})},true); // kept under the game sounds
 
 
 function hudHTML(){
  const th=theme(R.level),w=R.wave,full=army().length>=cap(),boss=isBoss(w)?'Boss wave':`Boss in ${Math.ceil(w/10)*10-w}`;
  return `<div class="hud" role="group" aria-label="Resources">
-  <div class="hg hg-lvl" title="Level ${R.level} · ${th.n}"><span class="lvtag">LV<b>${R.level}</b></span><span class="thm">${th.n}</span></div>
+  <div class="hg hg-lvl" title="Level ${R.level} · ${th.n}"><button class="hud-gear" id="hudSet" aria-label="Settings" title="Settings">${IC.gear}</button><span class="lvtag">LV<b>${R.level}</b></span><span class="thm">${th.n}</span></div>
   <div class="hg hg-econ"><span class="stat" id="hudEnergy" title="Energy. Unspent energy carries over (max ${bankCap()}). Next turn +${perTurn()}. Red stripes: what the next spin costs.">${IC.energy}<b>${R.energy}</b><i>/${bankCap()}</i><span class="ebar"><i id="ebar"></i><i id="ecost"></i></span></span><span class="stat" id="hudCredits" title="Credits: spend them in the Shop">${IC.credit}<b>${R.credits}</b><i>credits</i></span><span class="stat" id="hudChips" title="Chips: kept between runs, spent on parts at base">${IC.chip}<b>${meta.chips}</b><i>chips</i></span></div>
   <div class="hg"><span class="stat ${full?'full':''}" id="hudUnits" title="Units on the field / army allowance">${IC.units}<b>${army().length}/${cap()}</b><i>units</i></span></div>
   <div class="hg hg-wave"><span class="stat" title="Incursion wave">${IC.wave}<b>${w}/${R.depth}</b><i>wave</i></span><span class="stat hide-s ${isBoss(w)?'hot':''}" title="Next boss">${IC.skull}<b>${boss}</b></span></div></div>`}
@@ -3148,6 +3206,7 @@ function renderHome(){
   <div class="threat ${baseLevels()?'':'zero'}" title="A bonus to enemy HP and attack from your base upgrades. It reads only your permanent base, never how the current run is going."><span class="th-k">Threat</span><b>+${threatPct(1)}%</b><small>${baseLevels()?`Enemies rise to meet your base: +${threatPct(1)}% at wave 1, +${threatPct(pickDepth)}% by wave ${pickDepth}.`:'Every base upgrade you buy makes the enemy a little tougher.'}</small></div>
   <button class="btn gold spinbtn" id="go" style="width:100%">DEPLOY</button>
   <button class="btn cx-open" id="homeCodex" style="width:100%;margin-top:10px;font-family:var(--f-disp);font-size:18px">CODEX <small id="cxPct" style="font-family:var(--f-ui);font-size:13px;color:var(--mute)"></small><span data-codex-badge hidden></span></button>
+  <button class="btn" id="homeSet" style="width:100%;margin-top:10px;font-family:var(--f-disp);font-size:18px">SETTINGS</button>
   <ul class="how"><li><b>Spin</b> costs energy and each spin in a turn costs 50% more. Unspent energy carries over.</li><li><b>3 in a row</b> on any of 8 lines summons that unit. Lines pay again after a nudge or blast.</li><li><b>Nudge</b> drops a reel one step. <b>Blast</b> clears a symbol and new ones fall in.</li><li><b>Merge</b> two equal units to level up and pick a class.</li><li>An <b>incursion</b> pushes 10, 20 or 30 waves deep. Bosses guard every 10th wave, elites every 5th. You won't see the enemy until you hit <b>Battle!</b> Losing a wave ends the run.</li></ul></div>
   <div class="panel parts"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h2 style="font-size:22px">Upgrades</h2><span class="stat"><span class="dot" style="background:var(--blue)"></span>${meta.chips} <i>chips</i></span></div>
   <div class="opts">${UPS.map(u=>{const n=meta.up[u.id],max=u.costs.length,c=u.costs[n];return `<button class="opt" data-u="${u.id}" ${n<max&&meta.chips>=c?'':'disabled'}><span class="grow"><b>${u.n}</b><span class="pips">${u.costs.map((_,k)=>`<i class="${k<n?'f':''}"></i>`).join('')}</span><small>${u.d}</small></span><span class="price">${n<max?c+' chips':'MAX'}</span></button>`}).join('')}</div>
