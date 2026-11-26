@@ -1003,13 +1003,13 @@ body:has(#ovl .cc) .cx-stamp,body:has(#ovl .bm) .cx-stamp{visibility:hidden}
 // Battle roster v1 (docs/design.md). Ids are the asset folders in assets/units/<id>/sheet-v2.
 // row: 0 front line, 1 back line. The Deployer's orbs are not slot symbols: they launch in battle.
 const UNITS={
- soldier:{n:'Grunt',w:30,hp:40,atk:7,cd:1000,role:'ranged',c:'#7fcf4a',d:'#3f6e22',row:0,tip:'Line infantry with a forearm cannon. Cheap and numerous.'},
+ soldier:{n:'Grunt',w:24,hp:40,atk:7,cd:1000,role:'ranged',c:'#7fcf4a',d:'#3f6e22',row:0,tip:'Line infantry with a forearm cannon. Cheap and numerous.'},
  lancer:{n:'Lancer',w:16,hp:115,atk:9,cd:1400,role:'melee',shield:1,c:'#ffc23d',d:'#8a5c00',row:0,tip:'Shield wall. Allies right behind it take 40% less ranged damage.'},
  sniper:{n:'Longshot',w:15,hp:24,atk:19,cd:1800,role:'snipe',c:'#53d1ff',d:'#1a6f99',row:1,tip:'Backline rail-rifle. Picks off the weakest enemy in range.'},
- outrider:{n:'Outrider',w:13,hp:58,atk:10,cd:950,role:'melee',charge:1,c:'#ff8a4c',d:'#9a3a0a',row:0,tip:'Flanker. Its first blow is a drill charge for double damage.'},
- drone:{n:'Wasp',w:11,hp:30,atk:7,cd:900,role:'ranged',fly:1,c:'#e0e070',d:'#6a6a20',row:1,tip:'Flies over the lines and strafes. Melee enemies cannot reach it until it lands.'},
- hacker:{n:'Deployer',w:9,hp:26,atk:3,cd:1500,role:'ranged',orbs:1,c:'#ff6b9a',d:'#a8204e',row:1,tip:'Launches orbs: scout (reveals the enemy wave), mark, patch, jam. Keep it behind Lancers.'},
- commander:{n:'Commander',w:6,hp:95,atk:20,cd:1300,role:'melee',aura:1,c:'#b78cff',d:'#5a2fa8',row:0,tip:'Leader. Allies within its aura hit 20% harder.'},
+ outrider:{n:'Outrider',w:14,hp:58,atk:10,cd:950,role:'melee',charge:1,c:'#ff8a4c',d:'#9a3a0a',row:0,tip:'Flanker. Its first blow is a drill charge for double damage.'},
+ drone:{n:'Wasp',w:12,hp:30,atk:7,cd:900,role:'ranged',fly:1,c:'#e0e070',d:'#6a6a20',row:1,tip:'Flies over the lines and strafes. Melee enemies cannot reach it until it lands.'},
+ hacker:{n:'Deployer',w:11,hp:26,atk:3,cd:1500,role:'ranged',orbs:1,c:'#ff6b9a',d:'#a8204e',row:1,tip:'Launches orbs: scout (reveals the enemy wave), mark, patch, jam. Keep it behind Lancers.'},
+ commander:{n:'Commander',w:8,hp:95,atk:20,cd:1300,role:'melee',aura:1,c:'#b78cff',d:'#5a2fa8',row:0,tip:'Leader. Allies within its aura hit 20% harder.'},
 };
 const TYPES=Object.keys(UNITS), WSUM=TYPES.reduce((s,t)=>s+UNITS[t].w,0);
 const PATHS={
@@ -1164,13 +1164,14 @@ const rnd=n=>Math.floor(Math.random()*n);
 const has=id=>R.items.filter(i=>i===id).length;
 const hasCore=id=>!!R&&!!R.cores&&R.cores.includes(id); // socketed only; the bag is inactive
 const cap=()=>5+meta.up.cap+(R&&R.capBonus||0), slotsMax=()=>2+meta.up.slots, spinCap=()=>3+meta.up.spins;
-const perTurn=()=>25+5*meta.up.energy+8*has('cell');
+// energy income for the turn at wave w (BAL.econ.wave: income grows as the run goes deeper)
+const perTurn=(w=R.wave)=>BAL.econ.turn+Math.round(BAL.econ.wave*(w-1))+5*meta.up.energy+8*has('cell');
 const bankCap=()=>BANK+(hasCore('vault')?40:0);
 const nudgesPerTurn=()=>1+meta.up.nudge+has('coil')+(hasCore('nudgemotor')?1:0);
 // cost of spin #n this turn: Dead Cat free spin, Penny Slot first spin 5, Hot Streak -20% per paid spin this turn
 function costAt(n,streak=R.streak||0){
  if(n===0&&R.freeSpin&&hasCore('deadcat'))return 0;
- let c=10*Math.pow(has('damp')?1.3:1.5,n);if(n===0&&hasCore('penny'))c=5;
+ let c=10*Math.pow(has('damp')?Math.min(1.3,BAL.econ.grow):BAL.econ.grow,n);if(n===0&&hasCore('penny'))c=5;
  if(hasCore('hotstreak')&&streak)c*=Math.pow(.8,streak);return Math.round(c)}
 const spinCost=()=>costAt(R.spinsUsed);
 const army=()=>R.army;
@@ -1179,6 +1180,16 @@ const army=()=>R.army;
 const WHALE=TYPES.slice().sort((a,b)=>UNITS[a].w-UNITS[b].w).slice(0,2);
 const wOf=t=>UNITS[t].w*(hasCore('whale')&&WHALE.includes(t)?1.5:1),wSum=()=>TYPES.reduce((s,t)=>s+wOf(t),0);
 function randSym(rng=Math.random){let r=rng()*wSum();for(const t of TYPES){r-=wOf(t);if(r<0)return t}return 'soldier'}
+// ---- hidden luck: bad-luck protection (owner 2026-11-26, after Slotbound). Never shown in the UI. ----
+// R.dry = spins in a row that paid nothing (any paying spin, nudge or blast resets it).
+// Opening (the run's first 3 spins, while nothing has paid yet): spin 2 gets a second roll, spin 3 always pays.
+// Rest of the run: after 2 dry spins the next spin gets a second roll; after 3, the next one always pays.
+const luck=()=>{const d=R.dry||0;return !R.runPaid&&R.spinRun<=3?(d>=2?2:d>=1?1:0):(d>=3?2:d>=2?1:0)}; // 0 none · 1 second roll · 2 sure line
+// roll a grid at luck level lk. When luck steps in, it prefers lines of the type the army has fewest of (a rescue brings something new).
+function pickGrid(roll,lk){let g=roll();if(!lk||linesOf(g).length)return g;
+ const pay=[];for(let k=0;k<(lk===2?5000:1)&&pay.length<(lk===2?3:1);k++){const x=roll();if(linesOf(x).length)pay.push(x)}
+ if(!pay.length)return g;const own=t=>R.army.filter(u=>u.type===t).length,score=x=>Math.min(...linesOf(x).map(l=>own(x[l[0]])));
+ return pay.sort((a,b)=>score(a)-score(b))[0]}
 const theme=l=>THEMES[(l-1)%THEMES.length];
 
 function stats(u){
@@ -1194,8 +1205,8 @@ function stats(u){
 function uname(u){const g=u.gilded?'Gilded ':'',b=UNITS[u.type].n;if(u.lvl===1)return g+b;const p=PATHS[u.type][u.p[0]].n;return g+(u.lvl===3?TIER3[u.p[1]].n+' '+p:p)}
 
 function freshRun(level,depth){
- return {level,depth,wave:1,turn:1,energy:48+10*meta.up.start,credits:5,spinsUsed:0,nudges:1+meta.up.nudge,blasts:1,items:[],
-  cores:[],coreBag:[],sockBonus:0,spinRun:0,streak:0,rerolls:0,summonsTurn:0,freeSpin:false,peek:null,holdReel:null,stickyHold:false,holdUsed:0,stickyUsed:0,magnetTurn:0,chainTurn:0,gildedUsed:0,
+ return {level,depth,wave:1,turn:1,energy:BAL.econ.start+10*meta.up.start,credits:5,spinsUsed:0,nudges:1+meta.up.nudge,blasts:1,items:[],
+  cores:[],coreBag:[],sockBonus:0,spinRun:0,dry:0,runPaid:0,streak:0,rerolls:0,summonsTurn:0,freeSpin:false,peek:null,holdReel:null,stickyHold:false,holdUsed:0,stickyUsed:0,magnetTurn:0,chainTurn:0,gildedUsed:0,
   grid:Array.from({length:9},()=>randSym()),army:[],enemies:[],offers:[],sel:null,blast:false,toasts:[],phase:'manage',chain:0,heat:0}}
 function newRun(level,depth=pickDepth){
  meta.lastDepth=depth;saveMeta();
@@ -1204,10 +1215,11 @@ function newRun(level,depth=pickDepth){
 }
 // Incursion: a run pushes 10, 20 or 30 waves deep into the territory. Bosses at 10/20/30, elite waves at 5/15/25.
 const isBoss=w=>w%10===0, isElite=w=>w%10===5;
-// ---------- DIFFICULTY v2 (2026-11-25; docs/design.md "Difficulty v2", tuned with the ?sim=1 balance sim) ----------
+// ---------- DIFFICULTY v2/v3 (2026-11-25/26; docs/design.md "Difficulty v2" and "v3", tuned with the ?sim=1 balance sim) ----------
 // Every enemy's HP and attack are multiplied by
 //   m(L,w) = curve(t,w) · spike(t,w) · lvlStep^(L−1) · threat(w)          t = theme of level L, w = wave
-//   curve  = early[t][w−1] on waves 1–2, else (a + b·w + c·w²) · theme[t]
+//   curve  = early[t][w−1] on the first waves (4 on Zombie Horde, 2 elsewhere), else (a + b·w + c·w²) · theme[t] · ease
+//            ease (level 1 only, v3): starts at 70% and reaches 100% by wave 26, so new players learn before the curve bites
 //            a + b·w + c·w² tracks the measured strength of a scripted army as it merges up, so no wave goes soft
 //            once the army is built: normal waves sit at ~96–99% survival, never a free 100%.
 //   theme  = normalises the rosters: at equal stats an Alien wave hits ~1.7x and a Machine wave ~2x a Zombie wave
@@ -1221,11 +1233,13 @@ const isBoss=w=>w%10===0, isElite=w=>w%10===5;
 // Count n = min(nMax, n0 + ceil(nPer·w)) on every level; elite waves carry 1 + floor(w/10) elites.
 const BAL={
  a:3.4, b:.62, c:.015,
- early:[[1.2,2.5],[.68,1.75],[.45,1.55]],         // waves 1–2, absolute, per theme
+ early:[[.8,1.5,2.4,3.4],[.68,1.75],[.45,1.55]],   // the first waves, absolute, per theme (level 1 eases in over 4 waves)
  theme:[1,.58,.49],                                // Zombie Horde, Alien Swarm, Rogue Machines
  boss:[[.7,1,1.15],[.54,.53,.45],[.6,.7,.75]],      // boss-wave spike per theme at waves 10/20/30
- eliteWave:[1.15,.95,.9],                          // elite-wave spike at waves 5/15/25
+ eliteWave:[1,.95,.9],                             // elite-wave spike at waves 5/15/25
  lvlStep:1.08,
+ ease:{k:.7,until:26},                              // level 1 only, a learning ramp: the curve starts at 70% of itself and is full by wave 26
+ econ:{start:48,turn:30,wave:2,grow:1.5},           // run economy: start energy, income per turn (+wave·(w−1)), spin cost growth per spin in a turn
  threat:.017, tw:.09,
  n0:1, nPer:.55, nMax:9,
  elite:{hp:1.8,atk:1.3},                           // an elite vs a regular of the same wave
@@ -1235,7 +1249,8 @@ const baseLevels=()=>Object.values(meta.up).reduce((a,b)=>a+(+b||0),0);
 const threatPct=w=>Math.round(BAL.threat*baseLevels()*(1+BAL.tw*(w-1))*100); // the threat bonus at wave w, in %
 function waveMul(L,w){
  if(SIM.probe)return SIM.probe;
- const t=(L-1)%3,k=Math.min(2,Math.floor(w/10)),curve=w<=2?BAL.early[t][w-1]:(BAL.a+BAL.b*w+BAL.c*w*w)*BAL.theme[t],
+ const t=(L-1)%3,k=Math.min(2,Math.floor(w/10)),ez=L>1?1:BAL.ease.k+(1-BAL.ease.k)*Math.min(1,Math.max(0,(w-1)/(BAL.ease.until-1))),
+  curve=w<=BAL.early[t].length?BAL.early[t][w-1]:(BAL.a+BAL.b*w+BAL.c*w*w)*BAL.theme[t]*ez,
   spike=isBoss(w)?BAL.boss[t][Math.min(2,w/10-1)]:isElite(w)?BAL.eliteWave[k]:1;
  return curve*spike*Math.pow(BAL.lvlStep,L-1)*(1+BAL.threat*baseLevels()*(1+BAL.tw*(w-1)))}
 function makeWave(){
@@ -1613,9 +1628,9 @@ async function spin(power=.3){
  begin();payEnergy(cost);seedSpin();
  const forced=SL.force&&window.dwForce?window.dwForce(SL.force):null;
  const roll=()=>{const g=Array.from({length:9},()=>randSym(SL.rng));held.forEach(i=>g[i]=prev[i]);return g};
- let g=forced||roll();
- if(!forced&&sure&&!linesOf(g).length){for(let k=0;k<5000&&!linesOf(g).length;k++)g=roll();
-  if(!linesOf(g).length){const l=LINES[Math.floor(SL.rng()*8)],t=randSym(SL.rng);l.forEach(i=>g[i]=t)}bus.emit('sure_win',{nonce:SL.nonce,airdrop:air})}
+ const lk=forced?0:sure?2:luck();let g=forced||pickGrid(roll,lk);
+ if(lk===2&&!linesOf(g).length){const l=LINES[Math.floor(SL.rng()*8)],t=randSym(SL.rng);l.forEach(i=>g[i]=t)}
+ if(sure&&!forced)bus.emit('sure_win',{nonce:SL.nonce,airdrop:air});else if(lk)bus.emit('luck',{level:lk,dry:R.dry||0}); // cue log only (debug panel)
  const tz=heldCol===2?[]:teaseOf(g);
  bus.emit('spin_start',{cost,seed:SL.seed,nonce:SL.nonce,power:+power.toFixed(2),forced:SL.force||null});
  if(free)coreFire('deadcat','free spin');else if(penny)coreFire('penny','first spin costs 5');
@@ -1626,7 +1641,7 @@ async function spin(power=.3){
  R.grid=g;R.peek=null; // the reels moved: Orderbook re-reads what waits on top
  if(air)coreFire('airdrop','6th spin · sure line',true);
  await magnetSnap();
- const paid=await evaluate('spin');
+ const paid=await evaluate('spin');if(!paid)R.dry=(R.dry||0)+1;
  if(!paid){if(tz.length)nearMiss(tz);else dud();if(hasCore('loose')){R.credits++;coreFire('loose','+1 credit')}}
  else R.streak=(R.streak||0)+1;
  setChase(2.4);end();
@@ -1776,7 +1791,7 @@ async function evaluate(src,moved){
  const mv=moved?(moved instanceof Set?moved:new Set(moved)):null;
  const pay=(src==='nudge'||src==='blast')&&mv?hits.filter(l=>l.some(i=>mv.has(i))):hits;
  if(!pay.length){if(R.chain)bus.emit('chain_break',{chain:R.chain});R.chain=0;renderHeat();return false}
- R.chain++;await celebrate(pay,src);R.gildNow=0;return true;
+ R.chain++;R.dry=0;R.runPaid=1;await celebrate(pay,src);R.gildNow=0;return true;
 }
 const TIER=n=>n>=8?4:n>=3?3:n,HOLD=[0,420,650,950,1900];
 async function celebrate(pay,src){
@@ -2411,20 +2426,19 @@ function simEval(src,moved){let gild=0;
   if(t){R.grid[R.grid.findIndex(x=>x!==t)]=t;R.gildedUsed=1;gild=1}}
  const hits=linesOf(R.grid),pay=moved?hits.filter(l=>l.some(i=>moved.has(i))):hits;
  if(!pay.length)return false;
- const rally=pay.length>=2&&hasCore('rally');pay.forEach(l=>simSummon(R.grid[l[0]],{rally,gild}));SIM.lines+=pay.length;return true}
+ R.dry=0;R.runPaid=1;const rally=pay.length>=2&&hasCore('rally');pay.forEach(l=>simSummon(R.grid[l[0]],{rally,gild}));SIM.lines+=pay.length;return true}
 function simSpin(){
  const cost=spinCost(),first=R.spinsUsed===0,free=first&&cost===0;
  R.spinRun=(R.spinRun||0)+1;const air=hasCore('airdrop')&&R.spinRun%6===0,sure=lastPull()||air;
  R.spinsUsed++;R.energy-=cost;if(free)R.freeSpin=false;
- const roll=()=>Array.from({length:9},()=>randSym());let g=roll();
- if(sure&&!linesOf(g).length){for(let k=0;k<5000&&!linesOf(g).length;k++)g=roll();}
+ const roll=()=>Array.from({length:9},()=>randSym());let g=pickGrid(roll,sure?2:luck());
  R.grid=g;R.peek=null;
  if(hasCore('magnet')&&R.magnetTurn!==R.turn){const base=linesOf(R.grid).length,cand=[];
   for(const l of LINES){const v=l.map(i=>R.grid[i]);let odd=-1,t=null;
    if(v[0]===v[1]&&v[2]!==v[0]){odd=l[2];t=v[0]}else if(v[0]===v[2]&&v[1]!==v[0]){odd=l[1];t=v[0]}else if(v[1]===v[2]&&v[0]!==v[1]){odd=l[0];t=v[1]}
    if(odd>=0){const g2=R.grid.slice();g2[odd]=t;if(linesOf(g2).length>base)cand.push([odd,t])}}
   if(cand.length&&Math.random()<.25){const [i,t]=cand[rnd(cand.length)];R.magnetTurn=R.turn;R.grid[i]=t}}
- const paid=simEval('spin',null);if(!paid){if(hasCore('loose'))R.credits++}else R.streak=(R.streak||0)+1}
+ const paid=simEval('spin',null);if(!paid){R.dry=(R.dry||0)+1;if(hasCore('loose'))R.credits++}else R.streak=(R.streak||0)+1}
 function simBestNudge(){let best=null;
  for(let col=0;col<3;col++)for(const dir of has('gear')?[1,-1]:[1]){const p=nudgePreview(col,dir),v=p.sure.length+p.chance;if(!best||v>best.v)best={col,dir,v,sure:p.sure.length}}
  return best}
@@ -2444,20 +2458,21 @@ function simMerge(){for(let again=1;again;){again=0;
  for(const u of R.army){const s=R.army.find(x=>canMerge(x,u));if(!s)continue;
   R.army=R.army.filter(x=>x!==s);u.lvl++;u.rally=u.rally||s.rally;u.gilded=u.gilded||s.gilded;
   R.energy+=Math.max(0,Math.min(MERGE_ENERGY[u.lvl],bankCap()-R.energy));
-  if(u.lvl===2)u.p[0]=SIMP.path[u.type];else u.p[1]=SIMP.t3[u.type]??1;again=1;break}}}
+  if(SIM.novice){if(u.lvl===2)u.p[0]=rnd(2);else u.p[1]=rnd(2)}else if(u.lvl===2)u.p[0]=SIMP.path[u.type];else u.p[1]=SIMP.t3[u.type]??1;again=1;break}}}
 const simVal=u=>(UNITS[u.type].hp*UNITS[u.type].atk)*LV[u.lvl]*LV[u.lvl];
 function simBuy(k){const o=R.offers[k];R.credits-=offerPrice(o);o.sold=1;o.lock=false;
  if(o.k==='core'){const d=freeCoreSlot();coreList(d.w).splice(d.k,0,o.id);if(o.id==='nudgemotor'&&d.w==='s')R.nudges++;return}
  const it=ITEMS.find(x=>x.id===o.id);if(it.id==='charge')R.blasts++;else if(it.id==='recruit')simSummon(TYPES[rnd(TYPES.length)]);else if(it.id==='battery')R.energy=Math.min(bankCap(),R.energy+20);
  else{R.items.push(it.id);if(it.id==='coil')R.nudges++}}
-function simShop(){for(let rr=0;rr<3;rr++){
+function simShop(){if(SIM.novice){const ok=R.offers.map((o,k)=>[o,k]).filter(([o])=>offerState(o)==='ok'&&o.k==='item');if(ok.length&&Math.random()<.5)simBuy(ok[rnd(ok.length)][1]);return}
+ for(let rr=0;rr<3;rr++){
  for(;;){let best=-1,bv=0;R.offers.forEach((o,k)=>{if(offerState(o)!=='ok')return;
    let v=o.k==='core'?(R.cores.length<coreOpen()?SIMP.core[o.id]:0):SIMP.item[o.id];
    if(o.id==='recruit'&&R.army.length>=cap())v=0;if(o.id==='battery'&&R.energy>bankCap()-20)v=0;if(o.id==='charge'&&R.blasts>1)v=0;
    if(v>bv){bv=v;best=k}});
   if(best<0)break;simBuy(best)}
  if(R.credits>=rerollCost()+12){R.credits-=rerollCost();R.rerolls=(R.rerolls||0)+1;rollShop()}else break}}
-function simCache(tier){const ids=rollCache(tier).sort((a,b)=>SIMP.core[b]-SIMP.core[a]);const id=ids[0];if(!id)return;
+function simCache(tier){const ids=rollCache(tier).sort((a,b)=>SIMP.core[b]-SIMP.core[a]);const id=SIM.novice?ids[rnd(ids.length)]:ids[0];if(!id)return;
  const d=freeCoreSlot();if(d){coreList(d.w).splice(d.k,0,id);return}
  const worst=R.cores.reduce((a,b)=>SIMP.core[b]<SIMP.core[a]?b:a);if(SIMP.core[id]>SIMP.core[worst])R.cores[R.cores.indexOf(worst)]=id}
 // formation: Lancers front and centre, Deployers right behind them, Commander mid, Outriders on the flanks, shooters back
@@ -2472,20 +2487,23 @@ function simManage(){
    const l1=R.army.filter(u=>u.lvl===1).sort((a,b)=>simVal(a)-simVal(b));if(!l1.length)break;R.army=R.army.filter(u=>u!==l1[0]);R.credits+=2}
   if(!canSpin())break;
   simSpin();simMerge();
-  const n=R.nudges>0&&simBestNudge();if(n&&(n.sure||n.v>=.3)){simNudge(n.col,n.dir);simMerge()}
-  if(R.blasts>0){const b=simBestBlast();if(b.v>=.6){simBlast(b.s);simMerge()}}
+  const n=R.nudges>0&&simBestNudge();if(n&&(n.sure||!SIM.novice&&n.v>=.3)){simNudge(n.col,n.dir);simMerge()}
+  if(!SIM.novice&&R.blasts>0){const b=simBestBlast();if(b.v>=.6){simBlast(b.s);simMerge()}}
  }
- while(R.nudges>0){const n=simBestNudge();simNudge(n.col,n.dir);simMerge()}
- while(R.blasts>0){const b=simBestBlast();simBlast(b.s);simMerge()}
+ if(SIM.novice){if(R.blasts>0&&Math.random()<.5){const c={};R.grid.forEach(t=>c[t]=(c[t]||0)+1);simBlast(Object.keys(c).sort((a,b)=>c[b]-c[a])[0]);simMerge()}}
+ else{while(R.nudges>0){const n=simBestNudge();simNudge(n.col,n.dir);simMerge()}
+ while(R.blasts>0){const b=simBestBlast();simBlast(b.s);simMerge()}}
  if(!R.army.length)simSummon('soldier'); // Machine Bailout
  simShop();simMerge();
 }
 const simPower=()=>R.army.reduce((s,u)=>{const t=stats(u);return s+t.maxHp*t.atk/t.cd},0);
 function simBattle(real=true){
  if(real&&hasCore('oilcan')&&R.nudges>0)R.energy+=Math.max(0,Math.min(4*R.nudges,bankCap()-R.energy));
- simPlace();F=battleSetup();F.sim=1;let r=0;while(!(r=battleTick(SIM.dt)));
+ if(!SIM.novice)simPlace();F=battleSetup();F.sim=1;let r=0;while(!(r=battleTick(SIM.dt)));
  const P=F.P.filter(f=>!f.orb),hp=P.reduce((s,f)=>s+f.hp,0)/P.reduce((s,f)=>s+f.maxHp,0);F=null;return {won:r>0,hp}}
-const SIM={dt:40,lines:0};
+// SIM.novice: a new player's habits (owner: stuck at wave 3-4). Nudges only when the button shows a sure line, maybe one blast
+// at the end of the turn on the most common symbol, random merge paths, random shop picks, no formation (units stay where they land).
+const SIM={dt:40,lines:0,novice:false};
 function simRun(level,depth){
  R=freshRun(level,depth);makeWave();rollShop();const log=[];
  for(;;){simManage();const pw=simPower(),b=simBattle();log.push({w:R.wave,won:b.won,hp:b.hp,pw,army:R.army.length});
@@ -2493,8 +2511,8 @@ function simRun(level,depth){
   R.credits+=waveCredits(R.wave);if(R.wave>=R.depth)return {died:0,log};
   const tier=dropTier(R.wave);if(tier)simCache(tier);
   turnAdvance();makeWave();rollShop()}}
-if(/[?&]sim=1/.test(location.search))window.dwSim={run({level=1,depth=10,up={},n=100,dt=40,bal=null}={}){
- SIM.dt=dt;const bal0=JSON.stringify(BAL);if(bal)for(const k in bal)BAL[k]=typeof bal[k]==='object'&&!Array.isArray(bal[k])?Object.assign({},BAL[k],bal[k]):bal[k];const keep=meta,t0=performance.now();meta={chips:0,maxLevel:99,up:Object.assign({cap:0,energy:0,spins:0,slots:0,nudge:0,start:0,cores:0},up)};
+if(/[?&]sim=1/.test(location.search))window.dwSim={run({level=1,depth=10,up={},n=100,dt=40,bal=null,skill='expert'}={}){
+ SIM.dt=dt;SIM.novice=skill==='novice';const bal0=JSON.stringify(BAL);if(bal)for(const k in bal)BAL[k]=typeof bal[k]==='object'&&!Array.isArray(bal[k])?Object.assign({},BAL[k],bal[k]):bal[k];const keep=meta,t0=performance.now();meta={chips:0,maxLevel:99,up:Object.assign({cap:0,energy:0,spins:0,slots:0,nudge:0,start:0,cores:0},up)};
  const att=Array(depth+1).fill(0),win=Array(depth+1).fill(0),hp=Array(depth+1).fill(0),pw=Array(depth+1).fill(0),death={};let clear=0;
  try{for(let k=0;k<n;k++){const r=simRun(level,depth);if(!r.died)clear++;else death[r.died]=(death[r.died]||0)+1;
   for(const e of r.log){att[e.w]++;if(e.won){win[e.w]++;hp[e.w]+=e.hp}pw[e.w]+=e.pw}}}
@@ -2607,7 +2625,7 @@ function hudHTML(){
  const th=theme(R.level),w=R.wave,full=army().length>=cap(),boss=isBoss(w)?'Boss wave':`Boss in ${Math.ceil(w/10)*10-w}`;
  return `<div class="hud" role="group" aria-label="Resources">
   <div class="hg hg-lvl" title="Level ${R.level} · ${th.n}"><button class="hud-gear" id="hudSet" aria-label="Settings" title="Settings">${IC.gear}</button><span class="lvtag">LV<b>${R.level}</b></span><span class="thm">${th.n}</span></div>
-  <div class="hg hg-econ"><span class="stat" id="hudEnergy" title="Energy. Unspent energy carries over (max ${bankCap()}). Next turn +${perTurn()}. Red stripes: what the next spin costs.">${IC.energy}<b>${R.energy}</b><i>/${bankCap()}</i><span class="ebar"><i id="ebar"></i><i id="ecost"></i></span></span><span class="stat" id="hudCredits" title="Credits: spend them in the Shop">${IC.credit}<b>${R.credits}</b><i>credits</i></span><span class="stat" id="hudChips" title="Chips: kept between runs, spent on parts at base">${IC.chip}<b>${meta.chips}</b><i>chips</i></span></div>
+  <div class="hg hg-econ"><span class="stat" id="hudEnergy" title="Energy. Unspent energy carries over (max ${bankCap()}). Next turn +${perTurn(R.wave+1)}. Red stripes: what the next spin costs.">${IC.energy}<b>${R.energy}</b><i>/${bankCap()}</i><span class="ebar"><i id="ebar"></i><i id="ecost"></i></span></span><span class="stat" id="hudCredits" title="Credits: spend them in the Shop">${IC.credit}<b>${R.credits}</b><i>credits</i></span><span class="stat" id="hudChips" title="Chips: kept between runs, spent on parts at base">${IC.chip}<b>${meta.chips}</b><i>chips</i></span></div>
   <div class="hg"><span class="stat ${full?'full':''}" id="hudUnits" title="Units on the field / army allowance">${IC.units}<b>${army().length}/${cap()}</b><i>units</i></span></div>
   <div class="hg hg-wave"><span class="stat" title="Incursion wave">${IC.wave}<b>${w}/${R.depth}</b><i>wave</i></span><span class="stat hide-s ${isBoss(w)?'hot':''}" title="Next boss">${IC.skull}<b>${boss}</b></span></div></div>`}
 function bindHud(){Codex.badge();renderEbar()}

@@ -4,7 +4,7 @@ const [page, jobsF, outF, nTabs = '8'] = process.argv.slice(2);
 const PORT = process.env.PORT || 9451, jobs = JSON.parse(fs.readFileSync(jobsF, 'utf8'));
 const T = page.replace(/\.html$/, '') + '._sim.html';
 fs.writeFileSync(T, fs.readFileSync(page, 'utf8').split('\n').filter(l => !l.includes('fonts.googleapis')).join('\n'));
-const ch = spawn('google-chrome', ['--headless=new', '--no-sandbox', '--remote-debugging-port=' + PORT, '--user-data-dir=/tmp/dw-sim-' + PORT, '--allow-file-access-from-files',
+const ch = spawn('google-chrome', ['--headless=new', '--no-sandbox', '--password-store=basic', '--remote-debugging-port=' + PORT, '--user-data-dir=/tmp/dw-sim-' + PORT, '--allow-file-access-from-files',
   '--disable-renderer-backgrounding', '--disable-background-timer-throttling', '--renderer-process-limit=64', '--site-per-process', 'about:blank'], { stdio: 'ignore' });
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 let ver; for (let i = 0; i < 60; i++) { try { ver = await (await fetch(`http://127.0.0.1:${PORT}/json/version`)).json(); break } catch { await sleep(250) } }
