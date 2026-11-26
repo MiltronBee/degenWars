@@ -10,6 +10,10 @@ node server.mjs        # serves the game on http://127.0.0.1:8811
 
 Then open http://127.0.0.1:8811/.
 
+## Live build
+
+https://sol-pkmn.fun/degenwars/ (public, noindex). To update it, build, commit, then run `tools/deploy-sol-pkmn.sh` from a machine with SSH key access to `root@sol-pkmn.fun`. It ships the committed HEAD, not the working tree. The script header says what lives on the droplet.
+
 ## Layout
 
 | Path | What |

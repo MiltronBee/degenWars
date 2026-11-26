@@ -1905,7 +1905,7 @@ function renderTape(changed,dir){
  const txt=items.map(x=>`<span>${x}</span>`).join('');if(tr.dataset.t!==txt){tr.dataset.t=txt;tr.innerHTML=txt+txt}
 }
 async function poll(){
- try{const r=await fetch('/api/market',{cache:'no-store'});const j=await r.json();if(!j||!j.ok||!j.sol||!j.sol.price)throw new Error('bad feed');
+ try{const r=await fetch('api/market',{cache:'no-store'}) /* relative: also works under a path like /degenwars/ */;const j=await r.json();if(!j||!j.ok||!j.sol||!j.sol.price)throw new Error('bad feed');
   const s=j.sol,prev=SL.mk.price,changed=prev!==s.price;
   Object.assign(SL.mk,{ok:true,price:s.price,t:s.t,chg1m:s.chg1m||0,chg5m:s.chg5m||0,chg15m:s.chg15m||0,vol:s.vol||0,weather:j.weather||'crab'});
   if(changed){SL.mk.tick++;bus.emit('market_tick',{price:s.price})}renderTape(changed,prev==null?0:Math.sign(s.price-prev));
