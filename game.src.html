@@ -376,6 +376,22 @@ h1,h2,h3,.disp{font-family:'Russo One','Chakra Petch',sans-serif;font-weight:400
 .fu.enemy.flung{opacity:1;transform:translate(-50%,-82%);transition:none;z-index:940!important}
 .fu.enemy.flung .hp{opacity:0}
 .fu.enemy.flung.gone{opacity:0}
+/* multi-kill callouts (kills under 1 s of battle time apart) and the wave's final kill: slow motion, letterbox, push-in toward the kill */
+.mk{position:absolute;left:50%;top:30%;z-index:975;pointer-events:none;transform:translate(-50%,-50%);text-align:center;white-space:nowrap}
+.mk b{display:block;font:400 30px/1 'Saira Stencil One','Russo One',sans-serif;letter-spacing:.07em;text-transform:uppercase;color:var(--c);
+ text-shadow:0 3px 0 #1a0e07,2px 0 0 #1a0e07,-2px 0 0 #1a0e07,0 -2px 0 #1a0e07,0 0 18px rgba(0,0,0,.65)}
+.mk.t4 b{font-size:34px}
+.mk.t5 b,.mk.t6 b{font-size:36px;color:var(--cadmium);background:var(--a-paper,var(--ivory));padding:6px 16px 4px;border:4px solid currentColor;border-radius:2px;text-shadow:none;
+ box-shadow:0 4px 16px rgba(0,0,0,.65),inset 0 0 18px rgba(92,72,56,.45)}
+.mk.t6 b{font-size:40px;border-style:double;border-width:6px}
+.mk small{display:block;margin-top:5px;font:400 32px/1 'Russo One',sans-serif;color:#fff1cf;text-shadow:0 2px 0 #000,0 0 10px rgba(255,90,40,.6)}
+@media(max-width:979px){.mk b{font-size:22px}.mk.t4 b{font-size:25px}.mk.t5 b{font-size:26px}.mk.t6 b{font-size:28px}.mk small{font-size:24px}}
+.lbx{position:absolute;inset:0;z-index:970;pointer-events:none;overflow:hidden}
+.lbx i{position:absolute;left:0;right:0;height:10%;background:#0b0907}
+.lbx i:first-child{top:0;transform:translateY(-102%);box-shadow:0 2px 0 rgba(201,162,58,.22),0 6px 18px rgba(0,0,0,.6)}
+.lbx i:nth-child(2){bottom:0;transform:translateY(102%);box-shadow:0 -2px 0 rgba(201,162,58,.22),0 -6px 18px rgba(0,0,0,.6)}
+.lbx b{position:absolute;inset:0;opacity:0;background:radial-gradient(ellipse 72% 68% at 50% 50%,transparent 52%,rgba(12,8,5,.6))}
+#field.finale>:is(.terrain,.paint,.gplane,.zone,.elabel,.fu,.proj,.dmg){scale:var(--zm,1)}
 .info{margin-top:10px;background:linear-gradient(#2a2119,#1e1712);border:1px solid #4d3c29;border-radius:14px;padding:10px 12px;min-height:60px;font-size:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .info b{font-family:'Russo One';font-weight:400;color:#e8d3a8}
 .info .mute{color:var(--mute)}
@@ -1140,15 +1156,18 @@ function sheetBox(k){const S=SHEETS[k];if(!S)return null;const sw=(k.startsWith(
  return {style:`width:calc(var(--uz,1) * ${S.w.toFixed(2)}%);aspect-ratio:${S.frameWidth}/${S.frameHeight};--tx:${(-S.foot[0]*100).toFixed(1)}%;--ty:${(-S.foot[1]*100).toFixed(1)}%;--fx:${S.foot[0]};--fy:${S.foot[1]};--hy:${S.head??.1};--sw:${sw.toFixed(1)}%`,
   body:`<div class="sheet" data-k="${k}" style="background-image:url(${S.url});background-size:${S.cols*100}% ${S.rows*100}%"></div>`}}
 const anims=new Set();
+// TS: cosmetic time scale (the final kill's slow motion, see SLO). sprT: the sprite clock, real ms × TS, stopped during hitstop.
+let TS=1,sprT=performance.now(),sprLast=sprT;
 function play(el,clip,o={}){
  const S=el&&SHEETS[el.dataset.k],c=S&&S.clips[clip];if(!c)return 0;
- el._a={c,clip,t0:performance.now()-(o.off||0),loop:c.loop&&!o.once,then:o.then||null,hold:!!o.hold,i:-1};anims.add(el);return c.n/c.fps*1000;
+ el._a={c,clip,t0:sprT-(o.off||0),loop:c.loop&&!o.once,then:o.then||null,hold:!!o.hold,i:-1};anims.add(el);return c.n/c.fps*1000;
 }
 function tick(now){
- if(now<HS.until){requestAnimationFrame(tick);return} // hitstop: hold every sprite frame
- const k=F?speed:1;
+ const d=now-sprLast;sprLast=now;
+ if(now<HS.until){requestAnimationFrame(tick);return} // hitstop: hold every sprite frame (the clock stands still)
+ sprT+=d*TS;const k=F?speed:1;
  for(const el of anims){if(!el.isConnected){anims.delete(el);continue}const a=el._a,c=a.c,S=SHEETS[el.dataset.k];
-  let i=Math.floor((now-a.t0)/1000*c.fps*k);
+  let i=Math.floor((sprT-a.t0)/1000*c.fps*k);
   if(i>=c.n){if(a.loop)i%=c.n;else if(a.hold)i=c.n-1;else{play(el,a.then||el._base||'idle');continue}}
   if(i!==a.i){a.i=i;el.style.backgroundPosition=`${S.cols>1?i/(S.cols-1)*100:0}% ${S.rows>1?c.row/(S.rows-1)*100:0}%`}}
  requestAnimationFrame(tick)}
@@ -1260,6 +1279,7 @@ const BAL={
  n0:1, nPer:.55, nMax:9,
  elite:{hp:1.8,atk:1.3},                           // an elite vs a regular of the same wave
  bossUnit:{hp:2.2,atk:1.6,minus:2},               // the boss vs a regular of the same wave; escorts = count − minus
+ assist:{q:.9,pow:.4,min:.5,full:5,fade:10},       // hidden help for weak armies on level 1's first waves (v4, see assistK)
 };
 const baseLevels=()=>Object.values(meta.up).reduce((a,b)=>a+(+b||0),0);
 const threatPct=w=>Math.round(BAL.threat*baseLevels()*(1+BAL.tw*(w-1))*100); // the threat bonus at wave w, in %
@@ -1317,21 +1337,23 @@ const saveSettings=()=>{try{localStorage.setItem(SET_KEY,JSON.stringify(settings
 // Files live in audio/<name>.mp3. Until a file exists, hit/crit/explode/coin play a synthesized stand-in; lever stays silent.
 // Every sound has a category (SFX.cat, unlisted = sfx). Each category is a gain bus under the master bus:
 //   music: looped tracks from audio/music/<name>.mp3 (SFX.music)  ·  sfx: game sounds  ·  ui: interface sounds (none yet)
-const SFX={ctx:null,buf:{},nz:{},bus:{},track:null,last:{},gap:{hit:45,crit:60,explode:50,coin:40,click:40,button:40}, // gap: min ms between two plays of one sound
- cat:{lever:'sfx',roll:'sfx',win:'sfx',lose:'sfx',hit:'sfx',crit:'sfx',explode:'sfx',coin:'sfx',heart:'sfx',beat:'sfx',click:'ui',button:'ui'},
+const SFX={ctx:null,buf:{},nz:{},bus:{},track:null,last:{},gap:{hit:45,crit:60,explode:50,coin:40,click:40,button:40,multik:60}, // gap: min ms between two plays of one sound
+ cat:{lever:'sfx',roll:'sfx',win:'sfx',lose:'sfx',hit:'sfx',crit:'sfx',explode:'sfx',coin:'sfx',heart:'sfx',beat:'sfx',multik:'sfx',slowmo:'sfx',click:'ui',button:'ui'},
  CATS:[['music','Music'],['sfx','Effects'],['ui','Interface']], // category id, settings label
  trim:{hit:1.34,coin:1.47,win:1.19,roll:1.09,button:1.4,heart:1.2}, // per-file lift to one loudness: printed by tools/prep-audio.py (re-run it after changing audio/src);
    // heart is held to 1.2 (the script says 1.91, but its long tail drags the average down and its crack already peaks at -1 dB)
  loops:{roll:[.5,4.6]}, // loop range in s inside the steady part, only reached by very long spins
  init(){if(this.ctx)return this.ctx;const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return null;try{this.ctx=new AC()}catch(e){return null}
   const c=this.ctx;this.bus.master=c.createGain();this.bus.master.connect(c.destination);
-  for(const [k] of this.CATS){this.bus[k]=c.createGain();this.bus[k].connect(this.bus.master)}
+  this.lp=c.createBiquadFilter();this.lp.type='lowpass';this.lp.frequency.value=22000;this.lp.connect(this.bus.master); // music only: muffled during the final kill
+  for(const [k] of this.CATS){this.bus[k]=c.createGain();this.bus[k].connect(k==='music'?this.lp:this.bus.master)}
   this.apply(true);return c},
  // settings -> bus gains. Sliders run 0-100 on a squared curve so each step sounds about as big as the last.
  apply(now){const c=this.ctx;if(!c)return;const G=v=>Math.pow(Math.max(0,Math.min(100,+v||0))/100,2);
   const set=(n,v)=>{if(now||c.state!=='running'){n.gain.cancelScheduledValues(0);n.gain.value=v}else n.gain.setTargetAtTime(v,c.currentTime,.03)}; // a paused clock never reaches a ramp
   set(this.bus.master,settings.mute?0:G(settings.master));for(const [k] of this.CATS)set(this.bus[k],G(settings[k]))},
  out(name){return this.bus[this.cat[name]||'sfx']},
+ muffle(on){const c=this.ctx;if(!c||!this.lp)return;const f=this.lp.frequency,t=c.currentTime;f.cancelScheduledValues(t);f.setValueAtTime(Math.max(40,f.value),t);f.exponentialRampToValueAtTime(on?560:22000,t+(on?.12:.4))},
  // ---- music: playlists of tracks (audio/music/<slug>.mp3, made by tools/prep-audio.py) streamed on the music bus ----
  // A playlist plays its tracks in order and starts over; each track hands over to the next XF seconds before its end (cross-fade).
  // Switching playlists fades the old one out and remembers its track and time, so coming back resumes instead of restarting.
@@ -1370,6 +1392,8 @@ const SFX={ctx:null,buf:{},nz:{},bus:{},track:null,last:{},gap:{hit:45,crit:60,e
   else if(name==='explode'){hiss(700,.5,.55,.9,'lowpass');tone('sine',110,32,.45,.9)}
   else if(name==='coin'){tone('square',1320,1320,.05,.12);tone('square',1760,1760,.09,.12,.05)}
   else if(name==='beat'){tone('sine',95,45,.16,1);tone('sine',90,42,.16,.85,.22)} // thump, thump (the heart before it breaks)
+  else if(name==='multik'){tone('sine',150,55,.14,.9);hiss(1600,.8,.05,.3);tone('triangle',660,660,.16,.42,.02);tone('triangle',990,990,.34,.38,.09);tone('sine',1980,1980,.4,.08,.09)} // stamp thunk + rising bell (rate = tier)
+  else if(name==='slowmo'){tone('sine',210,38,.95,.9);tone('triangle',105,30,.8,.3,.02);hiss(380,.7,.8,.5,'lowpass')} // the world drops into slow motion
   else if(name==='heart'){hiss(2600,.7,.18,.7);tone('sine',70,30,.5,.8);tone('triangle',520,90,.55,.3)} // the crack (audio/heart.mp3 replaces it)
   else{out.disconnect();return null}
   return {out}}};
@@ -1447,7 +1471,7 @@ const FX=(()=>{
  const SMOKE=puff('rgba(48,49,47,.75)','rgba(48,49,47,0)','rgba(48,49,47,.3)'),DUST=puff('rgba(182,173,148,.6)','rgba(182,173,148,0)'),GLOW=puff('rgba(255,250,235,1)','rgba(255,150,50,0)','rgba(255,205,120,.55)');
  const P=[];let raf=0,lastT=0;
  function add(p){if(RM())return;if(P.length>380)P.shift();P.push(Object.assign({age:0,rot:0,vr:0,g:0,drag:1,vx:0,vy:0},p));if(!raf){lastT=performance.now();raf=requestAnimationFrame(step)}}
- function step(t){const dt=Math.min(.033,(t-lastT)/1000);lastT=t;ctx.setTransform(DPR,0,0,DPR,0,0);ctx.clearRect(0,0,VW,VH);
+ function step(t){const dt=Math.max(0,Math.min(.033,(t-lastT)/1000))*TS;lastT=t; /* a frame stamp can predate add()'s now(): never step back */ctx.setTransform(DPR,0,0,DPR,0,0);ctx.clearRect(0,0,VW,VH);
   for(let i=P.length-1;i>=0;i--){const p=P[i];p.age+=dt;if(p.age>=p.life||p.y>VH+60){P.splice(i,1);continue}
    p.vx*=p.drag;p.vy=p.vy*p.drag+p.g*dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.rot+=p.vr*dt;const k=p.age/p.life;
    // coin: bursts out like a token, then homes on its target (ease-in, slight arc) and pays on arrival
@@ -1490,13 +1514,12 @@ function shakeTick(t){const dt=(t-shakeLast)/1000;shakeLast=t;trauma=Math.max(0,
 // battlefield camera shake: same trauma model, written to --shx/--shy on #field; CSS moves only the world layers (HUD stays put)
 let camT=0,camRaf=0,camLast=0;const CAM_M=14;
 function camShake(a){if(RM())return;camT=Math.min(1,camT+a);if(!camRaf){camLast=performance.now();camRaf=requestAnimationFrame(camTick)}}
-function camTick(t){const dt=(t-camLast)/1000;camLast=t;camT=Math.max(0,camT-dt*2.2);const s=camT*camT,M=CAM_M,fl=$('#field');
+function camTick(t){const dt=(t-camLast)/1000*TS;camLast=t;camT=Math.max(0,camT-dt*2.2);const s=camT*camT,M=CAM_M,fl=$('#field');
  if(s<=.0005||!fl){if(fl){fl.style.removeProperty('--shx');fl.style.removeProperty('--shy')}camRaf=0;return}
  fl.style.setProperty('--shx',((Math.random()*2-1)*M*s).toFixed(1)+'px');fl.style.setProperty('--shy',((Math.random()*2-1)*M*s).toFixed(1)+'px');camRaf=requestAnimationFrame(camTick)}
 // hitstop: freeze the fight for ms (battle steps, sprite clips, every animation on the field); effects started after the call still run
 const HS={until:0};
 function hitstop(ms){if(RM())return;const now=performance.now();if(now<HS.until)return;HS.until=now+ms;
- for(const el of anims)if(el._a)el._a.t0+=ms; // sprite clips are time-based: push their start so they resume where they froze (tick() skips meanwhile)
  const fl=$('#field'),an=fl?fl.getAnimations({subtree:true}):[];an.forEach(a=>{try{a.pause()}catch(e){}});
  setTimeout(()=>an.forEach(a=>{try{if(a.playState==='paused')a.play()}catch(e){}}),ms)}
 const skipWaiters=new Set();let activeAnims=[];
@@ -2236,9 +2259,18 @@ function battleSetup(){
   ORB_ORDER.slice(0,n).forEach((r,i)=>P.push({orb:r,k:'orb-'+r,owner:h,side:'P',fly:1,launch:500+i*650,x:h.x,y:h.y,
    maxHp:Math.round(12*L*pw),atk:Math.round(3*L*pw),heal:Math.round(7*L*pw),cd:1600,role:'orb',rng:28,spd:12}))}
  const E=R.enemies.map(e=>Object.assign({},e,{side:'E',x:e.x+30}));
+ const P0=P.filter(f=>!f.orb),q=lanch(P0)/Math.max(1e-9,lanch(E)),k=assistK(q);
+ if(k<1)for(const e of E){e.maxHp=Math.max(1,Math.round(e.maxHp*k));e.atk=Math.max(1,Math.round(e.atk*k))}
  for(const f of [...P,...E]){f.hp=f.maxHp;f.tm=Math.random()*f.cd*.5}
- return {P,E,t:0};
+ return {P,E,t:0,q,assist:k};
 }
+// ---- hidden assist (Difficulty v4, owner 2026-11-27: new players stuck on waves 3-4 "even with several troops") ----
+// Lanchester strength of a side = total HP × total damage per second (heals count half). q = army / wave.
+// On level 1's first waves an army below BAL.assist.q times the wave meets a softer wave: enemy HP and attack × (q/q*)^pow,
+// never below min; in full up to wave full, fading out by wave fade. A strong army (any expert) never triggers it. Not shown in the UI.
+const lanch=l=>l.reduce((s,f)=>s+f.maxHp,0)*l.reduce((s,f)=>s+(f.atk+(f.heal||0)*.5)/f.cd,0);
+function assistK(q){const A=BAL.assist;if(!A||SIM.probe||R.level>1||R.wave>=A.fade||q>=A.q)return 1;
+ const t=R.wave<=A.full?1:1-(R.wave-A.full)/(A.fade-A.full);return 1-t*(1-Math.max(A.min,Math.pow(q/A.q,A.pow)))}
 // one fixed step of the fight: 1 = player won, -1 = player lost (army down or 60 s timeout), 0 = still fighting
 function battleTick(dt){F.t+=dt;
  for(const f of [...F.P,...F.E])if(f.hp>0)step(f,dt);
@@ -2249,7 +2281,7 @@ function startBattle(){
  if(busy)return;if(!army().length){toast('You have no units. Spin first!','#ff4d6d');return}
  R.phase='battle';R.sel=null;R.blast=false;stopAttract();bus.emit('turn_end',{turn:R.turn});
  if(hasCore('oilcan')&&R.nudges>0){const e=Math.max(0,Math.min(4*R.nudges,bankCap()-R.energy));R.energy+=e;shownEnergy=R.energy;coreFire('oilcan',`${R.nudges} unused nudge${R.nudges>1?'s':''} · +${e} energy`)}
- F=battleSetup();const {P,E}=F;mtab='field';render();scrollTo(0,0);E.forEach(e=>Codex.unlock('encounter',e.t));
+ F=battleSetup();const {P,E}=F;if(F.assist<1)bus.emit('assist',{k:+F.assist.toFixed(2),q:+F.q.toFixed(2)});mtab='field';render();scrollTo(0,0);E.forEach(e=>Codex.unlock('encounter',e.t));
  for(const f of P){const t=f.u&&f.u.type;
   if(t==='commander'){play(sheetOf(f),'rally',{once:1});setTimeout(()=>floatTxt(f,'RALLY!','#b78cff'),250)}
   if(t==='hacker')play(sheetOf(f),'deploy',{once:1})}
@@ -2356,16 +2388,67 @@ let crShown=0;
 function enemyDeath(a,dir,big,b){const e=a.el;
  const n=F.E.length,cr=waveCredits(R.wave),k=F.kills=(F.kills||0)+1,share=Math.floor(cr*k/n)-Math.floor(cr*(k-1)/n);
  F.paid=(F.paid||0)+share;R.credits+=share;
+ const mk=F.mk||(F.mk={n:0,t:-1e9});mk.n=F.t-mk.t<=MK_WIN?mk.n+1:1;mk.t=F.t;if(mk.n>=2)multiKill(mk.n);
+ const fin=F.E.every(x=>x.hp<=0)&&finaleStart(b,a.boss); // the wave's last enemy: slow motion until it blows up
  e.classList.add('flung');
- const boom=()=>{const c=rc(b);e.classList.add('gone');FX.boom(c.x,c.y,a.boss?1.8:1);
-  SFX.play('explode',{vol:a.boss?1:.7,rate:a.boss?.75:1});camShake(a.boss?.95:big?.45:.25);if(a.boss)flashScreen(.35,300);
+ const boom=()=>{const c=rc(b);e.classList.add('gone');if(fin)sloRelease(); // time snaps back with the blast
+  FX.boom(c.x,c.y,a.boss?1.8:fin?1.35:1);
+  SFX.play('explode',{vol:a.boss||fin?1:.7,rate:a.boss?.75:fin?.85:1});camShake(a.boss?.95:fin?.7:big?.45:.25);if(a.boss||fin)flashScreen(a.boss?.35:.22,300);
   dropCredits(c.x,c.y,share);dropEnergy(c.x,c.y,a.drop||0)};
  if(RM())return boom();
  const L=a.boss?1.25:1,fr=$('#field').getBoundingClientRect(),br=b.getBoundingClientRect(),cx=br.left+br.width/2,cy=br.top+br.height/2;
  const side=dir*Math.max(0,Math.min(br.width*.9*L,dir>0?fr.right-30-cx:cx-fr.left-30)),up=Math.max(0,Math.min(br.height*1.1*L,cy-fr.top-50));
  b.animate([{transform:'none'},{transform:`translate(${(side*.55).toFixed(1)}px,${-up}px) rotate(${dir*150}deg) scale(.95)`,offset:.45},
   {transform:`translate(${side.toFixed(1)}px,${(-up*.6).toFixed(1)}px) rotate(${dir*300}deg) scale(.8)`}],
-  {duration:a.boss?700:420,delay:big?85:0,easing:'cubic-bezier(.3,.7,.5,1)',fill:'forwards'}).onfinish=boom}
+  {duration:fin?(a.boss?320:280):a.boss?700:420,delay:big?85:0,easing:'cubic-bezier(.3,.7,.5,1)',fill:'forwards'}).onfinish=boom}
+// ---- multi-kills: kills under MK_WIN ms of battle time apart chain up (cosmetic only). Measured with the sim at 1 s:
+// waves 1-10 show a Double in 78% (expert) / 57% (novice) of waves, a Triple in 38% / 9%, a Rampage in 7% / 0%.
+const MK_WIN=1000,MK=[,,['Double kill','#efe2bf'],['Triple kill','#f2b14a'],['Multi kill','#ee8636'],['Rampage'],['Liquidation']],MK_SEMI=[0,0,0,2,4,5,7];
+function multiKill(n){const fl=$('#field');if(!fl)return;const t=Math.min(6,n),[txt,col='']=MK[t];
+ fl.querySelector('.mk')?.remove();const el=document.createElement('div');el.className='mk t'+t;if(col)el.style.setProperty('--c',col);
+ el.innerHTML=`<b>${txt}</b>${n>=6?`<small>×${n}</small>`:''}`;fl.appendChild(el);
+ SFX.play('multik',{vol:.5+.07*t,rate:Math.pow(2,MK_SEMI[t]/12),vary:0});bus.emit('multikill',{n});if(t>=3)camShake(.07*t);
+ const o={duration:1150+60*t,id:'rt'}; // id 'rt': the callout keeps real time through the final kill's slow motion
+ if(RM()){el.animate([{opacity:1},{opacity:1,offset:.8},{opacity:0}],o).onfinish=()=>el.remove();return}
+ const r=rr(-5,5),T='translate(-50%,-50%)';
+ el.animate([{transform:`${T} scale(2.4) rotate(${r.toFixed(1)}deg)`,opacity:0,easing:'cubic-bezier(.55,0,1,.45)'},{transform:`${T} scale(.92) rotate(${(r*.4).toFixed(1)}deg)`,opacity:1,offset:.15,easing:'ease-out'},
+  {transform:`${T} scale(1.05)`,offset:.23},{transform:`${T} scale(1)`,offset:.31},{transform:`${T} scale(1)`,opacity:1,offset:.8,easing:'ease-in'},{transform:`${T} translateY(-18px) scale(.96)`,opacity:0}],o).onfinish=()=>el.remove()}
+// ---- the wave's final kill: slow motion, letterbox and a push-in toward the kill (live battles only, off under reduced motion) ----
+// TS slows the cosmetic clocks (FX particles, sprite clips, battlefield camera). Every running WAAPI/CSS animation follows it through
+// playbackRate, re-applied each frame so effects born meanwhile slow down too; animations with id 'rt' keep real time.
+// The last enemy's blast releases it (or a tap / key / pad button, or the hold running out): time snaps back over outMs while the
+// camera pulls back. endWave waits for it (sloAfter). Battle speed 2x/3x shortens the hold by √speed.
+const SLO={on:false,raf:0,t0:0,rel:0,rate:.22,inMs:90,hold:1100,outMs:260,z:1.1,zr:1,zCur:1,px:0,py:0,cb:[],els:[],lb:null,fl:null};
+function setRate(r){for(const a of document.getAnimations())if(a.id!=='rt'&&a.playbackRate!==r)try{a.playbackRate=r}catch(e){}}
+function finaleStart(b,boss){const fl=$('#field');if(!fl||RM()||SLO.on)return false;
+ const sp=Math.sqrt(speed),fr=fl.getBoundingClientRect(),c=rc(b),W=fl.clientWidth,H=fl.clientHeight,sx=fr.width/W||1;
+ Object.assign(SLO,{on:true,t0:performance.now(),rel:0,rate:boss?.16:.22,hold:(boss?1700:1100)/sp,z:boss?1.16:1.1,zr:1,zCur:1,cb:[],fl});
+ // pivot 60% of the way from the field centre to the kill: the camera leans in without losing the field
+ SLO.px=W/2+((c.x-fr.left)/sx-W/2)*.6;SLO.py=H/2+((c.y-fr.top)/sx-H/2)*.6;
+ SLO.els=[...fl.children].filter(e=>e.matches('.terrain,.paint,.gplane,.zone,.elabel,.fu,.proj,.dmg'));
+ for(const e of SLO.els)e.style.transformOrigin=`${(SLO.px-e.offsetLeft).toFixed(1)}px ${(SLO.py-e.offsetTop).toFixed(1)}px`; // one shared pivot for every world layer
+ fl.classList.add('finale');
+ const lb=SLO.lb=document.createElement('div');lb.className='lbx';lb.innerHTML='<i></i><i></i><b></b>';fl.appendChild(lb);
+ const [t,bo,vg]=lb.children,o={duration:230,easing:'cubic-bezier(.2,.8,.3,1)',fill:'forwards',id:'rt'};
+ t.animate([{transform:'translateY(-102%)'},{transform:'none'}],o);bo.animate([{transform:'translateY(102%)'},{transform:'none'}],o);vg.animate([{opacity:0},{opacity:1}],o);
+ SFX.play('slowmo',{vol:boss?1:.8,vary:.03});SFX.muffle(true);bus.emit('final_kill',{boss:!!boss});
+ cancelAnimationFrame(SLO.raf);SLO.raf=requestAnimationFrame(sloTick);return true}
+function sloRelease(){const S=SLO;if(!S.on||S.rel)return;S.rel=performance.now();S.zr=S.zCur;SFX.muffle(false);
+ const lb=S.lb;if(!lb)return;const [t,bo,vg]=lb.children,o={duration:300,easing:'cubic-bezier(.5,0,.8,.4)',fill:'forwards',id:'rt'};
+ t.animate([{transform:'none'},{transform:'translateY(-102%)'}],o);bo.animate([{transform:'none'},{transform:'translateY(102%)'}],o);vg.animate([{opacity:1},{opacity:0}],o)}
+function sloTick(now){const S=SLO,e=now-S.t0;let r,z;
+ if(!S.rel&&e>=S.hold)sloRelease();
+ if(S.rel){const k=Math.min(1,(now-S.rel)/S.outMs);r=S.rate+(1-S.rate)*k*k;z=1+(S.zr-1)*Math.pow(1-k,3)}
+ else{const k=Math.min(1,e/S.inMs);r=1-(1-S.rate)*(1-(1-k)*(1-k));z=1+(S.z-1)*(1-Math.pow(1-Math.min(1,e/S.hold),3))}
+ TS=r;S.zCur=z;setRate(r);if(S.fl)S.fl.style.setProperty('--zm',z.toFixed(4));
+ if(S.rel&&now-S.rel>=S.outMs)return sloEnd();
+ S.raf=requestAnimationFrame(sloTick)}
+function sloEnd(){const S=SLO;TS=1;setRate(1);S.on=false;S.raf=0;
+ if(S.fl){S.fl.classList.remove('finale');S.fl.style.removeProperty('--zm')}S.els.forEach(e=>e.style.transformOrigin='');S.els=[];S.fl=null;
+ const lb=S.lb;S.lb=null;if(lb)setTimeout(()=>lb.remove(),80);
+ const cb=S.cb;S.cb=[];cb.forEach(f=>{try{f()}catch(e){console.error(e)}})}
+const sloAfter=f=>SLO.on?SLO.cb.push(f):f(); // run f once the slow motion is over (now if there is none)
+['pointerdown','keydown'].forEach(ev=>addEventListener(ev,()=>{if(SLO.on)sloRelease()},{capture:true,passive:true})); // any input skips it
 function dropCredits(x,y,v){if(!v)return;
  const tgt=['#hudCredits svg','#hudCredits','#shop small','#shop2c'].map(q=>$(q)).filter(Boolean).map(el=>el.getBoundingClientRect())
   .find(r=>r.width>0&&r.bottom>0&&r.top<innerHeight&&r.right>0&&r.left<innerWidth);
@@ -2420,11 +2503,12 @@ function shot(a,b,col){if(F&&F.sim)return;const fl=$('#field');if(!fl)return;con
  const ms=Math.round(200/speed);requestAnimationFrame(()=>{p.style.transition=`left ${ms}ms linear,top ${ms}ms linear`;p.style.left=x1+'%';p.style.top=y1+'%'});
  setTimeout(()=>p.remove(),ms+40)}
 function endWave(won){
- const f=F;F=null;syncMusic(); // the fight is over: back to the prep music, where it left off
- if(won)f.P.forEach(p=>{if(p.hp>0&&!p.orb)play(sheetOf(p),'win',{hold:1})});
+ const f=F,fin=SLO.on;F=null;
+ // the fight is over: back to the prep music, where it left off, and the survivors cheer (after the final kill's slow motion, if any)
+ sloAfter(()=>{syncMusic();if(won)f.P.forEach(p=>{if(p.hp>0&&!p.orb)play(sheetOf(p),'win',{hold:1})})});
  // Units that fell come back next turn (owner rule, 2026-11-25): the army is kept whole.
  f.E.forEach(e=>{if(e.hp<=0)Codex.unlock(e.boss?'boss':'kill',e.t)});setTimeout(()=>Codex.flush(),1200);
- setTimeout(()=>{
+ sloAfter(()=>setTimeout(()=>{
   if(won){const bonus=isBoss(R.wave)?10:isElite(R.wave)?5:0,cr=waveCredits(R.wave);R.credits+=cr-(f.paid||0); // kills already paid their share
    if(R.wave>=R.depth)return finish(true); // final wave: the run ends, no core drop
    // no "wave cleared" screen (owner: distracting): roll straight into the next turn; the reward shows as a toast
@@ -2434,7 +2518,7 @@ function endWave(won){
    R.lives--;bus.emit('life_lost',{left:R.lives,wave:R.wave});
    heartBreak(R.lives,()=>{nextTurn();heartLostPulse();toast(`Wave lost · −1 ♥ · ${R.lives} left`,'#ff6b6b')});
   }else finish(false);
- },900);
+ },fin?650:900));
 }
 const waveCredits=w=>5+Math.min(3*w,30)+(isBoss(w)?10:isElite(w)?5:0);
 // the state half of nextTurn (no DOM), shared with the balance sim; returns which start-of-turn cores fired
@@ -2509,7 +2593,7 @@ function simBlast(s){R.blasts--;const hit=R.grid.filter(t=>t===s).length;
  const res=refill(old,s,fresh);R.grid=res.g;R.peek=null;
  const paid=simEval('blast',new Set(res.fall.map((f,j)=>f?j:-1).filter(j=>j>=0)));
  if(paid&&hasCore('chain')&&R.chainTurn!==R.turn){R.chainTurn=R.turn;R.blasts++}}
-function simMerge(){for(let again=1;again;){again=0;
+function simMerge(){if(SIM.rookie&&!R.rkMerge)return;for(let again=1;again;){again=0;
  for(const u of R.army){const s=R.army.find(x=>canMerge(x,u));if(!s)continue;
   R.army=R.army.filter(x=>x!==s);u.lvl++;u.rally=u.rally||s.rally;u.gilded=u.gilded||s.gilded;
   R.energy+=Math.max(0,Math.min(MERGE_ENERGY[u.lvl],bankCap()-R.energy));
@@ -2536,16 +2620,17 @@ function simPlace(){const A=R.army,col={lancer:40,outrider:40,commander:34,soldi
  by('outrider').forEach((u,i)=>{u.x=40;u.y=i%2?52:12});spread(by('commander'),34);spread(by('soldier'),30);spread(by('drone'),22);spread(by('sniper'),10);
  by('hacker').forEach((u,i)=>{const l=L[i%Math.max(1,L.length)];u.x=30;u.y=l?l.y:30+i*6})}
 function simManage(){
+ if(SIM.rookie)R.rkMerge=Math.random()<SIM.mergeP; // a rookie remembers to merge on some turns only
  simShop();simMerge();
  for(let guard=0;guard<40;guard++){
-  if(R.army.length===cap()&&R.spinsUsed<spinCap()&&R.energy>=spinCost()){ // full: scrap the weakest Lv1 to keep spinning
+  if(!SIM.rookie&&R.army.length===cap()&&R.spinsUsed<spinCap()&&R.energy>=spinCost()){ // full: scrap the weakest Lv1 to keep spinning
    const l1=R.army.filter(u=>u.lvl===1).sort((a,b)=>simVal(a)-simVal(b));if(!l1.length)break;R.army=R.army.filter(u=>u!==l1[0]);R.credits+=2}
   if(!canSpin())break;
   simSpin();simMerge();
-  const n=R.nudges>0&&simBestNudge();if(n&&(n.sure||!SIM.novice&&n.v>=.3)){simNudge(n.col,n.dir);simMerge()}
+  const n=!SIM.rookie&&R.nudges>0&&simBestNudge();if(n&&(n.sure||!SIM.novice&&n.v>=.3)){simNudge(n.col,n.dir);simMerge()}
   if(!SIM.novice&&R.blasts>0){const b=simBestBlast();if(b.v>=.6){simBlast(b.s);simMerge()}}
  }
- if(SIM.novice){if(R.blasts>0&&Math.random()<.5){const c={};R.grid.forEach(t=>c[t]=(c[t]||0)+1);simBlast(Object.keys(c).sort((a,b)=>c[b]-c[a])[0]);simMerge()}}
+ if(SIM.novice){if(!SIM.rookie&&R.blasts>0&&Math.random()<.5){const c={};R.grid.forEach(t=>c[t]=(c[t]||0)+1);simBlast(Object.keys(c).sort((a,b)=>c[b]-c[a])[0]);simMerge()}}
  else{while(R.nudges>0){const n=simBestNudge();simNudge(n.col,n.dir);simMerge()}
  while(R.blasts>0){const b=simBestBlast();simBlast(b.s);simMerge()}}
  if(!R.army.length)simSummon('soldier'); // Machine Bailout
@@ -2555,24 +2640,26 @@ const simPower=()=>R.army.reduce((s,u)=>{const t=stats(u);return s+t.maxHp*t.atk
 function simBattle(real=true){
  if(real&&hasCore('oilcan')&&R.nudges>0)R.energy+=Math.max(0,Math.min(4*R.nudges,bankCap()-R.energy));
  if(!SIM.novice)simPlace();F=battleSetup();F.sim=1;let r=0;while(!(r=battleTick(SIM.dt)));
- const P=F.P.filter(f=>!f.orb),hp=P.reduce((s,f)=>s+f.hp,0)/P.reduce((s,f)=>s+f.maxHp,0);F=null;return {won:r>0,hp}}
+ const P=F.P.filter(f=>!f.orb),hp=P.reduce((s,f)=>s+f.hp,0)/P.reduce((s,f)=>s+f.maxHp,0),q=F.q,k=F.assist;F=null;return {won:r>0,hp,q,k}}
 // SIM.novice: a new player's habits (owner: stuck at wave 3-4). Nudges only when the button shows a sure line, maybe one blast
 // at the end of the turn on the most common symbol, random merge paths, random shop picks, no formation (units stay where they land).
-const SIM={dt:40,lines:0,novice:false};
+// SIM.rookie (skill:'rookie', a first-time player; owner 2026-11-27: "stuck on wave 3-4 even with several troops"): the novice
+// without nudges or blasts, who merges only on some turns (mergeP, default .35) and never scraps a unit to keep spinning.
+const SIM={dt:40,lines:0,novice:false,rookie:false,mergeP:.35};
 function simRun(level,depth){
  R=freshRun(level,depth);makeWave();rollShop();const log=[];
- for(;;){simManage();const pw=simPower(),b=simBattle();log.push({w:R.wave,won:b.won,hp:b.hp,pw,army:R.army.length});
+ for(;;){simManage();const pw=simPower(),b=simBattle();log.push({w:R.wave,won:b.won,hp:b.hp,pw,army:R.army.length,q:b.q,k:b.k});
   if(!b.won){if(R.lives>1&&!isBoss(R.wave)&&!isElite(R.wave)){R.lives--;turnAdvance();makeWave();rollShop();continue}return {died:R.wave,log}}
   R.credits+=waveCredits(R.wave);if(R.wave>=R.depth)return {died:0,log};
   const tier=dropTier(R.wave);if(tier)simCache(tier);
   turnAdvance();makeWave();rollShop()}}
-if(/[?&]sim=1/.test(location.search))window.dwSim={run({level=1,depth=10,up={},n=100,dt=40,bal=null,skill='expert'}={}){
- SIM.dt=dt;SIM.novice=skill==='novice';const bal0=JSON.stringify(BAL);if(bal)for(const k in bal)BAL[k]=typeof bal[k]==='object'&&!Array.isArray(bal[k])?Object.assign({},BAL[k],bal[k]):bal[k];const keep=meta,t0=performance.now();meta={chips:0,maxLevel:99,up:Object.assign({cap:0,energy:0,spins:0,slots:0,nudge:0,start:0,cores:0},up)};
- const att=Array(depth+1).fill(0),win=Array(depth+1).fill(0),hp=Array(depth+1).fill(0),pw=Array(depth+1).fill(0),death={};let clear=0;
+if(/[?&]sim=1/.test(location.search))window.dwSim={run({level=1,depth=10,up={},n=100,dt=40,bal=null,skill='expert',mergeP=.35}={}){
+ SIM.dt=dt;SIM.novice=skill==='novice'||skill==='rookie';SIM.rookie=skill==='rookie';SIM.mergeP=mergeP;const bal0=JSON.stringify(BAL);if(bal)for(const k in bal)BAL[k]=typeof bal[k]==='object'&&!Array.isArray(bal[k])?Object.assign({},BAL[k],bal[k]):bal[k];const keep=meta,t0=performance.now();meta={chips:0,maxLevel:99,up:Object.assign({cap:0,energy:0,spins:0,slots:0,nudge:0,start:0,cores:0},up)};
+ const att=Array(depth+1).fill(0),win=Array(depth+1).fill(0),hp=Array(depth+1).fill(0),pw=Array(depth+1).fill(0),qs=Array(depth+1).fill(0),ks=Array(depth+1).fill(0),death={};let clear=0;
  try{for(let k=0;k<n;k++){const r=simRun(level,depth);if(!r.died)clear++;else death[r.died]=(death[r.died]||0)+1;
-  for(const e of r.log){att[e.w]++;if(e.won){win[e.w]++;hp[e.w]+=e.hp}pw[e.w]+=e.pw}}}
+  for(const e of r.log){att[e.w]++;if(e.won){win[e.w]++;hp[e.w]+=e.hp}pw[e.w]+=e.pw;qs[e.w]+=Math.log(e.q);ks[e.w]+=e.k}}}
  finally{meta=keep;R=null;F=null;Object.assign(BAL,JSON.parse(bal0))}
- return {level,depth,up,n,clear:clear/n,death,att,win,hpLeft:hp.map((h,w)=>win[w]?+(h/win[w]).toFixed(2):null),power:pw.map((p,w)=>att[w]?Math.round(p/att[w]*1000):null),ms:Math.round(performance.now()-t0)}},
+ return {level,depth,up,n,clear:clear/n,death,att,win,hpLeft:hp.map((h,w)=>win[w]?+(h/win[w]).toFixed(2):null),power:pw.map((p,w)=>att[w]?Math.round(p/att[w]*1000):null),q:qs.map((x,w)=>att[w]?+Math.exp(x/att[w]).toFixed(2):null),assist:ks.map((x,w)=>att[w]?+(x/att[w]).toFixed(2):null),ms:Math.round(performance.now()-t0)}},
  BAL:()=>BAL,
  // probe: play the run normally, and before every battle also fight the same army against the wave at fixed enemy multipliers
  // -> win[w][i] = wins against mults[i] at wave w (the army's strength curve, independent of the live tuning)
@@ -2874,7 +2961,7 @@ Promise.all([sheetsReady,Ground.ready]).then(()=>{render();
  for(const t of TYPES)R.army.push({id:uid++,type:t,lvl:t==='hacker'?3:1,p:t==='hacker'?[0,0]:[],x:at[t][0],y:at[t][1]});
  mtab='field';render();if(demo==='battle')setTimeout(startBattle,600)});
 // gamepad.js runs outside this block, so it can't see R, view or busy: hand it live getters and the actions it drives
-window.dwGame={get R(){return R},get view(){return view},get busy(){return busy},
+window.dwGame={get R(){return R},get view(){return view},get busy(){return busy},get slowmo(){return SLO.on},skipSlowmo:sloRelease,
  bus,SFX,FX,SHEETS,canSpin,army,canMerge,clampDeploy,unitEl,rc,buzz,play,place,renderField,mergeUnits,scrap,startBattle,openSettings,autoPull,skipNow,stopAttract,armIdle,uname,leverGrab:grab};
 }
 </script>

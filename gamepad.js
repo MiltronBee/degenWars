@@ -303,7 +303,8 @@ function rumble(m, ms) {
   for (const p of pads) { const a = p.vibrationActuator; if (a && a.playEffect) a.playEffect('dual-rumble', { duration: ms, weakMagnitude: Math.min(1, m), strongMagnitude: Math.min(1, m * .8) }).catch(() => {}); }
 }
 const RUMBLE = { lever_release: d => [.3 + .5 * (d.power || 0), 90], lever_denied: () => [.35, 60], slam_stop: () => [.4, 50], line_win: () => [.35, 70],
-  jackpot: () => [1, 450], merge: () => [.7, 160], life_lost: () => [.9, 300], nudge_clunk: () => [.3, 45], lever_ratchet: () => [.12, 25], unit_drop: () => [.25, 40] };
+  jackpot: () => [1, 450], merge: () => [.7, 160], life_lost: () => [.9, 300], final_kill: d => [d.boss ? 1 : .7, d.boss ? 420 : 260],
+  multikill: d => [Math.min(1, .2 + .12 * d.n), 50 + 15 * Math.min(6, d.n)], nudge_clunk: () => [.3, 45], lever_ratchet: () => [.12, 25], unit_drop: () => [.25, 40] };
 window.degenCues?.on('*', (e, d) => { const f = RUMBLE[e]; if (f) rumble(...f(d || {})); });
 
 // ---------- input mode: the pad shows the layer, a mouse or a touch hides it ----------
@@ -340,6 +341,7 @@ function step(s, t, dt) {
   const woke = (pressed || moving) && !on;
   if (woke) wake();
   if (pressed || moving) { try { stopAttract(); armIdle(); } catch (e) {} }
+  if (pressed && G.slowmo) { try { G.skipSlowmo(); } catch (e) {} } // any button skips the final kill's slow motion
   if (pressed) { try { const c = SFX.init(); if (c && c.state === 'suspended') c.resume(); if (SFX.track && SFX.track.el.paused) SFX.track.el.play().catch(() => {}); } catch (e) {} }
   if (on) {
     if (hit(BT.A) && !woke) pressA(); // the first touch of the pad only shows the highlight

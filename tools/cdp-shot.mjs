@@ -1,7 +1,7 @@
 // node cdp.mjs <url> <out.png> <waitMs> : headless Chrome via DevTools, prints console errors, saves a screenshot
 import { spawn } from 'node:child_process'; import fs from 'node:fs';
 const [url, out, wait = '3000'] = process.argv.slice(2);
-const ch = spawn('google-chrome', ['--headless=new', '--no-sandbox', '--remote-debugging-port=' + (process.env.PORT||9333) + '', '--user-data-dir=' + (process.env.PROF||'/tmp/dw-cdp'), '--allow-file-access-from-files', '--window-size=1600,1000',
+const ch = spawn('google-chrome', ['--headless=new', '--no-sandbox', '--password-store=basic', '--remote-debugging-port=' + (process.env.PORT||9333) + '', '--user-data-dir=' + (process.env.PROF||'/tmp/dw-cdp'), '--allow-file-access-from-files', '--window-size=1600,1000',
   '--host-resolver-rules=MAP fonts.googleapis.com ~NOTFOUND, MAP fonts.gstatic.com ~NOTFOUND', 'about:blank'], { stdio: 'ignore' });
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 let tabs; for (let i = 0; i < 40; i++) { try { tabs = await (await fetch('http://127.0.0.1:' + (process.env.PORT||9333) + '/json')).json(); break } catch { await sleep(250) } }
