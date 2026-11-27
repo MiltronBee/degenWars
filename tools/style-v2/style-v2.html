@@ -1789,8 +1789,8 @@ const BAL={
  a:3.4, b:.62, c:.015,
  early:[[1,1.9,3,4.1],[.68,1.75],[.45,1.55]],      // the first waves, absolute, per theme (level 1 eases in over 4 waves; owner: v3's 0.8-3.4 felt too easy)
  theme:[1,.58,.49],                                // Zombie Horde, Alien Swarm, Rogue Machines
- boss:[[.7,1,.95],[.54,.53,.45],[.6,.7,.65]],      // boss-wave spike per theme at waves 10/20/30 (wave 30 on levels 1 and 3 eased with the
-                                                   // nudge/blast lock: 1.15 -> .95 and .75 -> .65 keep its old survival, 59% -> 64% and 84% -> 80%)
+ boss:[[.7,1,1.04],[.54,.53,.45],[.6,.7,.62]],     // boss-wave spike per theme at waves 10/20/30 (wave 30 on levels 1 and 3 re-tuned with the
+                                                   // nudge/blast lock and the softer-hitting boss below, so the final boss keeps its old survival)
  eliteWave:[1.15,.95,.9],                          // elite-wave spike at waves 5/15/25
  lvlStep:1.08,
  ease:{k:.7,until:26},                              // level 1 only, a learning ramp: the curve starts at 70% of itself and is full by wave 26
@@ -1800,7 +1800,10 @@ const BAL={
  threat:.017, tw:.09,
  n0:1, nPer:.55, nMax:9,
  elite:{hp:1.8,atk:1.3},                           // an elite vs a regular of the same wave
- bossUnit:{hp:2.2,atk:1.6,minus:2},               // the boss vs a regular of the same wave; escorts = count − minus
+ bossUnit:{hp:3,atk:.85,minus:2},                 // the boss vs a regular of the same wave; escorts = count − minus. Was hp 2.2, atk 1.6:
+                                                   // the wave-10 boss one-shot every Lv2 unit (121 dmg a hit on level 1) and a normal Lv2
+                                                   // army beat it 5/10 on level 1, 0/10 on level 2 (owner: "impossible"). Now it hits for
+                                                   // 64 and has 36% more HP: 7/10 and 6/10, and the fight is a slugging match, not a race.
  assist:{q:.9,pow:.4,min:.5,full:5,fade:10},       // hidden help for weak armies on level 1's first waves (v4, see assistK)
  // absorption: Absorb LV a donor gives by its level (plus its own Absorb LV and imprint levels), +rare for a Commander or
  // Deployer, +rally for a Rally unit. Each Absorb LV gives +lv HP and damage, linearly: with spins, nudges and blasts locked
@@ -2642,12 +2645,25 @@ function tapGround(x,y){
  if(x>DEPLOY){toast('Deploy on your side of the line','#ff4d6d');return}
  R.sel=null;glideTo(s,x,y);
 }
+// Picking a unit under the pointer. A sprite frame is 1.2-1.6x wider than the body drawn in it (room for the animations),
+// so neighbouring .fu boxes overlap and a click went to whichever box was on top (the unit lower on screen), even on the
+// body of the one behind it (owner, 2026-11-27). pickUnit() goes by the drawn body instead: head to feet, a bit wider than
+// the unit's shadow. A point inside a body picks the body whose centre is nearest; outside all of them, the nearest body
+// within 24 px. Clicks on the field's HUD (ribbon, counters, buttons) pick nothing.
+function pickUnit(e){if(e.target.closest('.fhead,.ucount,.bossbar,button,.lbx,.mk'))return null;const x=e.clientX,y=e.clientY;let best=null,bd=1e9;
+ for(const el of document.querySelectorAll('#field .fu[data-id]')){const r=el.getBoundingClientRect();if(!r.width)continue;const st=el.style,
+   fx=parseFloat(st.getPropertyValue('--fx'))||.5,fy=parseFloat(st.getPropertyValue('--fy'))||.85,hy=parseFloat(st.getPropertyValue('--hy'))||.1,sw=parseFloat(st.getPropertyValue('--sw'))||45;
+  const cx=r.left+fx*r.width,top=r.top+hy*r.height,bot=r.top+fy*r.height,hw=Math.max(14,sw/100*r.width*.7),cy=(top+bot)/2,hh=Math.max(14,(bot-top)/2+6);
+  const ox=Math.max(0,Math.abs(x-cx)-hw),oy=Math.max(0,Math.abs(y-cy)-hh),out=Math.hypot(ox,oy); // px outside the body box (0 inside)
+  const d=out?1e3+out:Math.hypot((x-cx)/hw,(y-cy)/hh); // inside: distance to the centre, in body sizes
+  if(d<bd){bd=d;best=el}}
+ return bd<1e3+24?best:null}
 // pointer drag on the field (mouse and touch)
 let DR=null;
 function bindDrag(fl){
  const toWorld=e=>{const G=gframe(),r=fl.getBoundingClientRect();if(!G)return null;const [ga,gb]=G.toGround((e.clientX-r.left)*G.W/r.width,(e.clientY-r.top)*G.H/r.height);
   return {x:ga*FW,y:YMIN+gb*(YMAX-YMIN),gb}};
- fl.addEventListener('pointerdown',e=>{if(!R||R.phase==='battle'||busy||e.button>0)return;const el=e.target.closest('.fu[data-id]');if(!el)return;
+ fl.addEventListener('pointerdown',e=>{if(!R||R.phase==='battle'||busy||e.button>0)return;const el=pickUnit(e);if(!el)return;
   const u=R.army.find(x=>x.id===+el.dataset.id);if(!u)return;
   const w=toWorld(e);DR={u,el,home:[u.x,u.y],id:e.pointerId,sx:e.clientX,sy:e.clientY,ox:w?u.x-w.x:0,oy:w?u.y-w.y:0,on:false,hot:null}});
  fl.addEventListener('pointermove',e=>{if(!DR||e.pointerId!==DR.id)return;
@@ -3517,7 +3533,7 @@ function renderField(){
  if(battle){const els=[...document.querySelectorAll('#field .fu')];[...F.P,...F.E].forEach((f,k)=>{f.el=els[k];f.sh=null})}
  else{document.querySelectorAll('#field .sheet').forEach(s=>play(s,'idle',{off:Math.random()*1500}));
  bindDrag($('#field'));
- $('#field').onclick=e=>{if(e.currentTarget._noclick||e.target.closest('#fight2'))return;const u=e.target.closest('.fu');if(u&&u.dataset.id){tapUnit(+u.dataset.id);return}const r=e.currentTarget.getBoundingClientRect();const G=gframe();if(!G)return;const [ga,gb]=G.toGround((e.clientX-r.left)*G.W/r.width,(e.clientY-r.top)*G.H/r.height);if(!(gb>-.03&&gb<1.03)){if(R.sel!==null)toast('Units stand on the ground','#ff8a6b');return}tapGround(ga*FW,YMIN+Math.max(0,Math.min(1,gb))*(YMAX-YMIN))};}
+ $('#field').onclick=e=>{if(e.currentTarget._noclick||e.target.closest('#fight2'))return;const u=pickUnit(e);if(u&&u.dataset.id){tapUnit(+u.dataset.id);return}const r=e.currentTarget.getBoundingClientRect();const G=gframe();if(!G)return;const [ga,gb]=G.toGround((e.clientX-r.left)*G.W/r.width,(e.clientY-r.top)*G.H/r.height);if(!(gb>-.03&&gb<1.03)){if(R.sel!==null)toast('Units stand on the ground','#ff8a6b');return}tapGround(ga*FW,YMIN+Math.max(0,Math.min(1,gb))*(YMAX-YMIN))};}
  $('#scrap')&&($('#scrap').onclick=scrap);
  if(!battle){$('#absorbBtn')&&($('#absorbBtn').onclick=toggleAbsorb);$('#lockU')&&($('#lockU').onclick=()=>toggleLock(s.id));
   const hb=$('#holdAbs');if(hb){hb.onpointerdown=e=>{e.preventDefault();holdStart(+hb.dataset.hold)};hb.onkeydown=e=>{if((e.key===' '||e.key==='Enter')&&!e.repeat){e.preventDefault();holdStart(+hb.dataset.hold)}};hb.onclick=e=>e.preventDefault()}}
