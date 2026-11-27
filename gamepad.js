@@ -67,6 +67,7 @@ let cur = null, curKey = null, curRect = null, curSym = false, focusT = 0, autoF
 let lastRoot = null, lastOvlChild = null, lastView = null, lastRun = null, prev = new Array(17).fill(false);
 let navHeld = null, navNext = 0, slideT = 0, defT = 0, legendHTML = '';
 let grab = null; // {id, x, y, hot, held, moved}: a unit carried by the pad
+let holdBtn = false; // A is holding a "Hold to absorb" button
 const memo = new Map(); // layer root -> key of the last highlighted element, so closing a dialog returns there
 let mx = -1, my = -1;
 
@@ -195,8 +196,8 @@ function grabTick(dt, ix, iy) {
   }
   let hot = null, best = 4.5; // same reach as the touch drag
   for (const v of G.R.army) { if (v === u) continue; const d = Math.hypot((v.x - grab.x) / 1.4, v.y - grab.y); if (d < best) { best = d; hot = v; } }
-  if (hot !== grab.hot) { if (grab.hot) unitEl(grab.hot.id)?.classList.remove('mergehot', 'swaphot'); grab.hot = hot; if (hot) { buzz(5); rumble(.15, 30); } }
-  if (hot) unitEl(hot.id)?.classList.add(canMerge(u, hot) ? 'mergehot' : 'swaphot');
+  if (hot !== grab.hot) { if (grab.hot) unitEl(grab.hot.id)?.classList.remove('mergehot', 'swaphot', 'absorbhot'); grab.hot = hot; if (hot) { buzz(5); rumble(.15, 30); } }
+  if (hot) unitEl(hot.id)?.classList.add(G.R.absorb ? 'absorbhot' : canMerge(u, hot) ? 'mergehot' : 'swaphot');
   document.getElementById('field')?.classList.add('placing', 'dragging-on');
   const el = unitEl(u.id); // re-applied every frame: a re-render puts the unit back home otherwise
   if (el) { el.classList.add('dragging'); el.classList.remove('sel'); place(el, grab.x, grab.y, u.type); el.style.zIndex = 999; }
@@ -204,12 +205,13 @@ function grabTick(dt, ix, iy) {
 // drop=true: land it here (merge / swap / move). drop=false: put it back where it was.
 function dropGrab(drop = true) {
   const g = grab; grab = null; if (!g || !G.R) return;
-  document.querySelectorAll('#field .fu.mergehot,#field .fu.swaphot').forEach(o => o.classList.remove('mergehot', 'swaphot'));
+  document.querySelectorAll('#field .fu.mergehot,#field .fu.swaphot,#field .fu.absorbhot').forEach(o => o.classList.remove('mergehot', 'swaphot', 'absorbhot'));
   document.getElementById('field')?.classList.remove('dragging-on');
   const u = G.R.army.find(x => x.id === g.id);
   if (!drop || !u || G.R.phase === 'battle' || G.busy) { if (G.R.sel === g.id) G.R.sel = null; if (u && G.R.phase !== 'battle' && !G.busy && document.getElementById('field')) renderField(); return; }
   const hot = g.hot && G.R.army.includes(g.hot) ? g.hot : null, el = unitEl(u.id);
   el?.classList.remove('dragging');
+  if (hot && G.R.absorb) { bus.emit('unit_drop', { unit: u.type, absorb: true }); curKey = `div[data-id="${hot.id}"]`; return G.absorbInto(u, hot); } // Absorb mode: any unit onto any other
   if (hot && canMerge(u, hot)) { bus.emit('unit_drop', { unit: u.type, merge: true }); curKey = `div[data-id="${hot.id}"]`; return mergeUnits(u, hot); }
   G.R.sel = null;
   if (hot) { // swap: the carried unit takes the other's spot, the other walks to where the carried one started
@@ -233,6 +235,7 @@ function pressA() {
   if (el.id === 'lever' || el.id === 'spin' && el.disabled) return spinPad(); // a locked spin still gets the game's "why not" feedback
   if (el.disabled) return;
   if (el.matches('#field .fu[data-id]')) return grabUnit(+el.dataset.id);
+  if (el.matches('[data-hold]')) { holdBtn = true; return G.holdStart(+el.dataset.hold); } // Hold to absorb: runs while A is held
   if (el.matches('input[type=range]')) return;
   if (el.matches('.machine .controls .btn,.nudges button')) { el.classList.add('pressed'); bus.emit('button_press', { id: el.id || 'nudge' }); setTimeout(() => el.classList.remove('pressed'), 140); }
   el.click();
@@ -303,7 +306,7 @@ function rumble(m, ms) {
   for (const p of pads) { const a = p.vibrationActuator; if (a && a.playEffect) a.playEffect('dual-rumble', { duration: ms, weakMagnitude: Math.min(1, m), strongMagnitude: Math.min(1, m * .8) }).catch(() => {}); }
 }
 const RUMBLE = { lever_release: d => [.3 + .5 * (d.power || 0), 90], lever_denied: () => [.35, 60], slam_stop: () => [.4, 50], line_win: () => [.35, 70],
-  jackpot: () => [1, 450], merge: () => [.7, 160], life_lost: () => [.9, 300], final_kill: d => [d.boss ? 1 : .7, d.boss ? 420 : 260],
+  jackpot: () => [1, 450], merge: () => [.7, 160], life_lost: () => [.9, 300], absorb: () => [.35, 60], army_ok: () => [.5, 90], army_over: () => [.45, 120], final_kill: d => [d.boss ? 1 : .7, d.boss ? 420 : 260],
   multikill: d => [Math.min(1, .2 + .12 * d.n), 50 + 15 * Math.min(6, d.n)], nudge_clunk: () => [.3, 45], lever_ratchet: () => [.12, 25], unit_drop: () => [.25, 40] };
 window.degenCues?.on('*', (e, d) => { const f = RUMBLE[e]; if (f) rumble(...f(d || {})); });
 
@@ -345,6 +348,7 @@ function step(s, t, dt) {
   if (pressed) { try { const c = SFX.init(); if (c && c.state === 'suspended') c.resume(); if (SFX.track && SFX.track.el.paused) SFX.track.el.play().catch(() => {}); } catch (e) {} }
   if (on) {
     if (hit(BT.A) && !woke) pressA(); // the first touch of the pad only shows the highlight
+    if (!now[BT.A] && prev[BT.A] && holdBtn) { holdBtn = false; G.holdEnd(); }
     if (!now[BT.A] && prev[BT.A] && grab && grab.held) { grab.held = false; if (grab.moved > 2.5) dropGrab(true); } // hold A, carry, let go
     if (hit(BT.B)) back();
     if (hit(BT.X)) spinPad();

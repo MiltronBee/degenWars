@@ -12,7 +12,7 @@ Then open http://127.0.0.1:8811/.
 
 ## Controller
 
-Plays with a gamepad (ROG Ally, Xbox, Steam Deck, DualSense) in Chrome or Edge over https or localhost; browsers only expose gamepads to secure pages. A gold highlight moves with the left stick or D-pad and **A** presses it. On the field, **A** grabs a unit, the stick carries it, and **A** drops it: on a matching unit it merges, on another unit they swap.
+Plays with a gamepad (ROG Ally, Xbox, Steam Deck, DualSense) in Chrome or Edge over https or localhost; browsers only expose gamepads to secure pages. A gold highlight moves with the left stick or D-pad and **A** presses it. On the field, **A** grabs a unit, the stick carries it, and **A** drops it: on a matching unit it merges, on another unit they swap. In Absorb mode (the Absorb button under the field) dropping it on any unit absorbs it. Holding **A** on Hold to absorb keeps absorbing until you let go.
 
 | Button | Does |
 |---|---|
