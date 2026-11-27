@@ -1576,8 +1576,8 @@ const IMPRINT={
  commander:{n:'Valor',hp:.07,atk:.07,d:l=>`+${7*l}% HP and damage`},
 };
 const ROMAN=['','I','II','III','IV','V'];
-// absorb XP (u.ax) -> Absorb LV: LV n takes n(n+1)/2 XP in all
-const abLvOf=x=>Math.floor((Math.sqrt(8*(x||0)+1)-1)/2),abLv=u=>abLvOf(u.ax),abNext=l=>(l+1)*(l+2)/2;
+// Absorb LV (u.ax): one level per point a donor gives, no diminishing (see BAL.absorb)
+const abLvOf=x=>Math.floor(x||0),abLv=u=>abLvOf(u.ax);
 const LV=[0,1,1.7,2.8];
 const THEMES=[
  {n:'Zombie Horde',units:[{t:'walker',n:'Walker',hp:34,atk:6,cd:1400,role:'melee'},{t:'runner',n:'Runner',hp:20,atk:6,cd:800,role:'melee'}],boss:{t:'brute',n:'Brute',hp:150,atk:12,cd:1600,role:'melee'}},
@@ -1789,7 +1789,8 @@ const BAL={
  a:3.4, b:.62, c:.015,
  early:[[1,1.9,3,4.1],[.68,1.75],[.45,1.55]],      // the first waves, absolute, per theme (level 1 eases in over 4 waves; owner: v3's 0.8-3.4 felt too easy)
  theme:[1,.58,.49],                                // Zombie Horde, Alien Swarm, Rogue Machines
- boss:[[.7,1,1.15],[.54,.53,.45],[.6,.7,.75]],      // boss-wave spike per theme at waves 10/20/30
+ boss:[[.7,1,.95],[.54,.53,.45],[.6,.7,.65]],      // boss-wave spike per theme at waves 10/20/30 (wave 30 on levels 1 and 3 eased with the
+                                                   // nudge/blast lock: 1.15 -> .95 and .75 -> .65 keep its old survival, 59% -> 64% and 84% -> 80%)
  eliteWave:[1.15,.95,.9],                          // elite-wave spike at waves 5/15/25
  lvlStep:1.08,
  ease:{k:.7,until:26},                              // level 1 only, a learning ramp: the curve starts at 70% of itself and is full by wave 26
@@ -1801,10 +1802,12 @@ const BAL={
  elite:{hp:1.8,atk:1.3},                           // an elite vs a regular of the same wave
  bossUnit:{hp:2.2,atk:1.6,minus:2},               // the boss vs a regular of the same wave; escorts = count − minus
  assist:{q:.9,pow:.4,min:.5,full:5,fade:10},       // hidden help for weak armies on level 1's first waves (v4, see assistK)
- // absorption: absorb XP a donor gives by its level (plus its own XP and imprint levels), +rare for a Commander or Deployer,
- // +rally for a Rally unit. Absorb LV n needs n(n+1)/2 XP in all (1, 3, 6, 10...): feeding one unit gets slower, spreading pays.
- // Each Absorb LV gives +lv HP and damage. Imprint slots by unit level, imprint levels up to impMax. Every donor salvages
- // `salvage` credits (scrap pays 2), a Gilded one `gild` more. ip scales every imprint (tuning only).
+ // absorption: Absorb LV a donor gives by its level (plus its own Absorb LV and imprint levels), +rare for a Commander or
+ // Deployer, +rally for a Rally unit. Each Absorb LV gives +lv HP and damage, linearly: with spins, nudges and blasts locked
+ // over the allowance, absorption is the army's late-game growth, and at +5% the probe (dwSim.probe) puts the army's strength
+ // within ~0.95-1.25x of the pre-lock army at every wave on levels 1-3, so the enemy curve stays as it was.
+ // Imprint slots by unit level, imprint levels up to impMax. Every donor salvages `salvage` credits (scrap pays 2), a Gilded
+ // one `gild` more. ip scales every imprint (tuning only).
  absorb:{lv:.05,slots:[0,2,2,3],donor:[0,1,2,4],rare:1,rally:1,salvage:1,gild:5,impMax:5,ip:1},
 };
 const baseLevels=()=>Object.values(meta.up).reduce((a,b)=>a+(+b||0),0);
@@ -2580,7 +2583,7 @@ function absorbInto(s,u,choice,o={}){
   bus.emit('absorb',{unit:u.type,donor:s.type,gain:r.gain,res:r.res,army:used(),cap:cap()});renderField();renderControls();bumpArmy('');if(r.credits)showCredits(R.credits);
   const ne=unitEl(u.id);if(ne){const c=rc(ne);ne.classList.remove('mergepop');void ne.offsetWidth;ne.classList.add('mergepop');FX.sparks(c.x,c.y,o.quick?7:14,.8);FX.dust(c.x,c.y+c.h*.35,2);
    ne.querySelector('.lvup')?.remove();const t=document.createElement('div'),I=IMPRINT[r.imp];t.className='lvup abs';
-   t.innerHTML=`<b>${r.up?`Absorb LV ${abLv(u)}`:`+${r.gain} absorb XP`}</b><small>${r.res==='convert'?`${I.n} converted`:r.res==='replace'?`${I.n} ${ROMAN[r.lv]} (replaced)`:`${I.n} ${ROMAN[r.lv]}`}${r.credits?` · +${r.credits} credits`:''}</small>`;
+   t.innerHTML=`<b>Absorb LV ${abLv(u)}</b><small>+${r.gain} · ${r.res==='convert'?`${I.n} converted`:r.res==='replace'?`${I.n} ${ROMAN[r.lv]} (replaced)`:`${I.n} ${ROMAN[r.lv]}`}${r.credits?` · +${r.credits} credits`:''}</small>`;
    ne.appendChild(t);setTimeout(()=>t.remove(),o.quick?900:1400)}
   SFX.play('absorb',{vol:o.quick?.45:.7,rate:1+Math.min(.5,(o.k||0)*.05)});buzz(o.quick?6:[8,20,12]);
   if(wasOver&&!overCap()){toast('Back within the allowance · spin unlocked','#9be07a');bus.emit('army_ok',{army:used(),cap:cap()});const sp=$('#spin');if(sp&&!RM())sp.animate([{transform:'scale(1)'},{transform:'scale(1.08)',filter:'brightness(1.4)'},{transform:'scale(1)'}],{duration:380})}};
@@ -2594,15 +2597,15 @@ function absorbInto(s,u,choice,o={}){
 // a merged donor (Lv2+) is 2 or 4 units' worth on the field. Absorbing one just to spin again is the trap the sim found
 // (expert depth-30 clear 20% -> 0%), so the game asks first and says what is lost and what is gained.
 function absorbWarn(s,u,choice){const st=stats(s),g=absorbGain(s),l0=abLv(u),l1=abLvOf((u.ax||0)+g),n=s.lvl===3?4:2;
- modal(`<h2>Absorb a merged unit?</h2><p><b>${uname(s)}</b> is Lv${s.lvl}, ${n} ${UNITS[s.type].n}s' worth on the field (${st.maxHp} HP · ${st.atk} dmg). Absorbed, it gives ${uname(u)} +${g} absorb XP${l1>l0?` (Absorb LV ${l0} → ${l1})`:''} and its imprint.</p>
+ modal(`<h2>Absorb a merged unit?</h2><p><b>${uname(s)}</b> is Lv${s.lvl}, ${n} ${UNITS[s.type].n}s' worth on the field (${st.maxHp} HP · ${st.atk} dmg). Absorbed, it gives ${uname(u)} +${g} Absorb LV (${l0} → ${l1}) and its imprint.</p>
   <p class="mute">Merged units are usually worth more on the field. If you only need room to spin, fight with the overflow or absorb Lv1 units instead.</p>
   <div class="mrow"><button class="btn" id="close">Keep it</button><button class="btn red" id="absYes">Absorb anyway</button></div>`,
   m=>{m.querySelector('#close').onclick=()=>{closeModal();renderField()};m.querySelector('#absYes').onclick=()=>{closeModal();absorbInto(s,u,choice,{okMerged:1})}})}
 // the receiver's imprint slots are full: replace one of its imprints, or convert the new one into Absorb LV
 function absorbChoice(s,u){const I=IMPRINT[s.type],L=s.lvl,g=absorbGain(s);
- modal(`<h2>Imprint slots full</h2><p>${uname(u)} holds ${impSlots(u)} imprints. ${uname(s)} brings <b>${I.n} ${ROMAN[L]}</b> (${I.d(L)}) and +${g} absorb XP.</p>
-  <div class="opts">${Object.entries(u.imp).map(([k,l])=>`<button class="opt" data-rep="${k}"><span class="grow"><b>Replace ${IMPRINT[k].n} ${ROMAN[l]}</b><small>${IMPRINT[k].d(l)} → ${I.d(L)}. Its ${l} level${l>1?'s become':' becomes'} absorb XP (+${g+l} in all).</small></span></button>`).join('')}
-  <button class="opt" data-conv="1"><span class="grow"><b>Convert ${I.n}</b><small>Keep the imprints. ${I.n} becomes absorb XP: +${g+L} in all.</small></span></button></div>
+ modal(`<h2>Imprint slots full</h2><p>${uname(u)} holds ${impSlots(u)} imprints. ${uname(s)} brings <b>${I.n} ${ROMAN[L]}</b> (${I.d(L)}) and +${g} Absorb LV.</p>
+  <div class="opts">${Object.entries(u.imp).map(([k,l])=>`<button class="opt" data-rep="${k}"><span class="grow"><b>Replace ${IMPRINT[k].n} ${ROMAN[l]}</b><small>${IMPRINT[k].d(l)} → ${I.d(L)}. Its ${l} level${l>1?'s become':' becomes'} Absorb LV (+${g+l} in all).</small></span></button>`).join('')}
+  <button class="opt" data-conv="1"><span class="grow"><b>Convert ${I.n}</b><small>Keep the imprints. ${I.n} becomes Absorb LV: +${g+L} in all.</small></span></button></div>
   <div class="mrow"><button class="btn" id="close">Cancel</button></div>`,
   m=>{m.querySelectorAll('[data-rep]').forEach(b=>b.onclick=()=>{closeModal();absorbInto(s,u,{replace:b.dataset.rep},{okMerged:1})});
    m.querySelector('[data-conv]').onclick=()=>{closeModal();absorbInto(s,u,{convert:1},{okMerged:1})};m.querySelector('#close').onclick=()=>{closeModal();renderField()}})}
@@ -3301,8 +3304,9 @@ if(/[?&]sim=1/.test(location.search))window.dwSim={run({level=1,depth=10,up={},n
   const win=Array.from({length:depth+1},()=>mults.map(()=>0)),att=Array(depth+1).fill(0);
   try{for(let k=0;k<n;k++){R=freshRun(level,depth);makeWave();rollShop();
    for(;;){simManage();const real=R.enemies;att[R.wave]++;
-    mults.forEach((m,i)=>{SIM.probe=m;makeWave();SIM.probe=0;if(simBattle(false).won)win[R.wave][i]++});
-    R.enemies=real;if(R.wave>=R.depth)break; // the run always goes on (as if won): unbiased army growth
+    mults.forEach((m,i)=>{const e0=R.energy;SIM.probe=m;makeWave();SIM.probe=0;if(simBattle(false).won)win[R.wave][i]++;R.energy=e0}); // probe fights don't pay their energy drops
+    R.enemies=real;simBattle(false); // the real wave, for its energy drops (the run goes on as if won)
+    if(R.wave>=R.depth)break; // the run always goes on (as if won): unbiased army growth
     R.credits+=waveCredits(R.wave);const tier=dropTier(R.wave);if(tier)simCache(tier);turnAdvance();makeWave();rollShop()}}}
   finally{SIM.probe=0;meta=keep;R=null;F=null;Object.assign(BAL,JSON.parse(bal0))}
   return {level,depth,up,n,mults,att,win}}};
@@ -3499,10 +3503,10 @@ function renderField(){
  else{s=R.army.find(u=>u.id===R.sel);
   units=R.army.map(u=>{const tgt=s&&u!==s&&u.type===s.type&&u.lvl===s.lvl&&u.lvl<3;return fu({id:u.id,k:u.type,aura:UNITS[u.type].aura,spr:'',lvl:u.lvl,ab:abLv(u),lock:u.lock,x:u.x,y:u.y,pct:100,cls:(u===s?'sel':tgt&&!R.absorb?'target':'')+(u.gilded?' gild':'')})}).join('');
   const absBtn=army().length>1||R.absorb?`<button class="btn speed absb ${R.absorb?'on':''}" id="absorbBtn" aria-pressed="${!!R.absorb}" title="Absorb mode: drag a unit onto any other to absorb it">${R.absorb?'Absorb: on':'Absorb'}</button>`:'';
-  if(s&&R.absorb){const I=IMPRINT[s.type];info=`<div class="grow"><b>Absorb ${uname(s)}</b>${s.lock?`<div class="intel" style="color:#ff8a6b">Locked: unlock it to absorb it.</div>`:`<div class="mute">Tap the unit that takes it in. It gives +${absorbGain(s)} absorb XP and its imprint, <b class="imp">${I.n} ${ROMAN[s.lvl]}</b> (${I.d(s.lvl)})${s.gilded?`, plus ${BAL.absorb.gild} credits`:''}, and salvages ${BAL.absorb.salvage} credit.</div>`}</div><div class="ubtns">${absBtn}</div>`}
-  else if(s){const st=stats(s);info=`<div class="grow"><b>${uname(s)}</b> <span class="mute">Lv${s.lvl}</span><div class="mute">${s.gilded?'<b style="color:#f6d987;font-size:12px">GILDED +25%</b> · ':''}${s.rally?'<b style="color:#8fd0c8;font-size:12px">RALLY +10%</b> · ':''}${st.maxHp} HP · ${st.atk} dmg${st.heal?` · heals ${st.heal}`:''} · every ${(st.cd/1000).toFixed(1)}s · range ${UMOVE[s.type].rng>12?'long':'melee'}</div>${s.ax||impN(s)?`<div class="mute absl">Absorb LV ${abLv(s)} (${s.ax||0}/${abNext(abLv(s))} XP${abLv(s)?` · +${Math.round(BAL.absorb.lv*100*abLv(s))}% HP and damage`:''}) · imprints ${impN(s)}/${impSlots(s)}${impN(s)?': '+impHTML(s):''}</div>`:''}<div class="mute">${UNITS[s.type].tip}</div><div class="mute">Tap your side of the field to move it${s.lvl<3?`, or a glowing Lv${s.lvl} ${UNITS[s.type].n} to merge`:''}.</div></div><div class="ubtns"><button class="btn speed lockb ${s.lock?'on':''}" id="lockU" aria-pressed="${!!s.lock}" title="A locked unit is never absorbed or scrapped">${s.lock?LOCK:UNLOCK}<span>${s.lock?'Locked':'Lock'}</span></button><button class="btn speed" id="scrap" ${s.lock?'disabled':''}>Scrap +2c</button>${impN(s)>=impSlots(s)&&holdDonors(s).length?`<button class="btn speed holdb ${HA.u===s?'on':''}" id="holdAbs" data-hold="${s.id}" title="Hold: takes in unlocked units one by one (commonest first) as absorb XP">Hold to absorb<small>${holdDonors(s).filter(x=>x.lvl<2).length} unlocked${holdDonors(s).some(x=>x.lvl>1)?` · ${holdDonors(s).filter(x=>x.lvl>1).length} merged`:''}</small></button>`:''}${absBtn}</div>`}
+  if(s&&R.absorb){const I=IMPRINT[s.type];info=`<div class="grow"><b>Absorb ${uname(s)}</b>${s.lock?`<div class="intel" style="color:#ff8a6b">Locked: unlock it to absorb it.</div>`:`<div class="mute">Tap the unit that takes it in. It gives +${absorbGain(s)} Absorb LV and its imprint, <b class="imp">${I.n} ${ROMAN[s.lvl]}</b> (${I.d(s.lvl)})${s.gilded?`, plus ${BAL.absorb.gild} credits`:''}, and salvages ${BAL.absorb.salvage} credit.</div>`}</div><div class="ubtns">${absBtn}</div>`}
+  else if(s){const st=stats(s);info=`<div class="grow"><b>${uname(s)}</b> <span class="mute">Lv${s.lvl}</span><div class="mute">${s.gilded?'<b style="color:#f6d987;font-size:12px">GILDED +25%</b> · ':''}${s.rally?'<b style="color:#8fd0c8;font-size:12px">RALLY +10%</b> · ':''}${st.maxHp} HP · ${st.atk} dmg${st.heal?` · heals ${st.heal}`:''} · every ${(st.cd/1000).toFixed(1)}s · range ${UMOVE[s.type].rng>12?'long':'melee'}</div>${s.ax||impN(s)?`<div class="mute absl">Absorb LV ${abLv(s)}${abLv(s)?` (+${Math.round(BAL.absorb.lv*100*abLv(s))}% HP and damage)`:''} · imprints ${impN(s)}/${impSlots(s)}${impN(s)?': '+impHTML(s):''}</div>`:''}<div class="mute">${UNITS[s.type].tip}</div><div class="mute">Tap your side of the field to move it${s.lvl<3?`, or a glowing Lv${s.lvl} ${UNITS[s.type].n} to merge`:''}.</div></div><div class="ubtns"><button class="btn speed lockb ${s.lock?'on':''}" id="lockU" aria-pressed="${!!s.lock}" title="A locked unit is never absorbed or scrapped">${s.lock?LOCK:UNLOCK}<span>${s.lock?'Locked':'Lock'}</span></button><button class="btn speed" id="scrap" ${s.lock?'disabled':''}>Scrap +2c</button>${impN(s)>=impSlots(s)&&holdDonors(s).length?`<button class="btn speed holdb ${HA.u===s?'on':''}" id="holdAbs" data-hold="${s.id}" title="Hold: takes in unlocked units one by one (commonest first) as Absorb LV">Hold to absorb<small>${holdDonors(s).filter(x=>x.lvl<2).length} unlocked${holdDonors(s).some(x=>x.lvl>1)?` · ${holdDonors(s).filter(x=>x.lvl>1).length} merged`:''}</small></button>`:''}${absBtn}</div>`}
   else{const intel=R.army.some(u=>u.type==='hacker')?Object.entries(R.enemies.reduce((m,e)=>(m[e.n]=(m[e.n]||0)+1,m),{})).map(([n,c])=>`${c} ${n}`).join(' · '):'';
-   info=`<div class="grow"><b>Army ${used()}/${cap()}</b>${overCap()?`<div class="intel" style="color:#ff8a6b">Over capacity by ${used()-cap()}: all of them fight, but paid spins, nudges and blasts are locked until you absorb, merge or scrap ${used()-cap()}.</div>`:''}${R.absorb?`<div class="intel absi">Absorb mode: drag a unit onto any other. It is gone for good and leaves absorb XP, its imprint and 1 credit. Locked units are safe.</div>`:''}${isBoss(R.wave)||isElite(R.wave)?`<div class="intel" style="color:#ff8a6b">${isBoss(R.wave)?'Boss':'Elite'} wave: losing it ends the run, hearts or not.</div>`:''}<div class="mute">${army().length?'Tap a unit, then tap the field to reposition it. Tap two matching units to merge.':'Spin the Summoner. Three in a row deploys a unit here.'}</div>${intel?`<div class="intel">Scout orb intel: ${intel}</div>`:''}</div>${absBtn?`<div class="ubtns">${absBtn}</div>`:''}`}}
+   info=`<div class="grow"><b>Army ${used()}/${cap()}</b>${overCap()?`<div class="intel" style="color:#ff8a6b">Over capacity by ${used()-cap()}: all of them fight, but paid spins, nudges and blasts are locked until you absorb, merge or scrap ${used()-cap()}.</div>`:''}${R.absorb?`<div class="intel absi">Absorb mode: drag a unit onto any other. It is gone for good and leaves Absorb LV, its imprint and 1 credit. Locked units are safe.</div>`:''}${isBoss(R.wave)||isElite(R.wave)?`<div class="intel" style="color:#ff8a6b">${isBoss(R.wave)?'Boss':'Elite'} wave: losing it ends the run, hearts or not.</div>`:''}<div class="mute">${army().length?'Tap a unit, then tap the field to reposition it. Tap two matching units to merge.':'Spin the Summoner. Three in a row deploys a unit here.'}</div>${intel?`<div class="intel">Scout orb intel: ${intel}</div>`:''}</div>${absBtn?`<div class="ubtns">${absBtn}</div>`:''}`}}
  $('.fieldcol').innerHTML=`<div class="fwrap">
   <div class="fbox"><div class="field ${!battle&&R.sel!==null?'placing':''}${!battle&&R.absorb?' absorbmode':''}" id="field"><svg class="terrain" viewBox="0 0 100 60" preserveAspectRatio="xMidYMid slice">${TERRAIN}</svg><div class="paint"></div><svg class="gplane" id="gplane" preserveAspectRatio="none"></svg><div class="zone"><span class="zlabel">Your side</span></div><span class="elabel">${th.n} · Lv${R.level}</span><div class="fhead ribbon">${trackHTML(battle)}</div>${bossBar}${battle
       ?`<div class="ucount"><div><b id="ucP">${F.P.filter(f=>f.hp>0&&!f.orb).length}/${F.P.filter(f=>!f.orb).length}</b><small>YOURS</small></div><span class="sep"></span><div class="foe"><b id="ucE">${F.E.filter(f=>f.hp>0&&f.seen).length}</b><small>ENEMIES</small></div></div>`
