@@ -1815,6 +1815,7 @@ function dud(){bus.emit('dud');const b=bezel();if(b){b.classList.add('sag');setT
 // ---- nudge: blind, odds shown; clunk, then a shutter reveal ----
 async function nudge(col,dir){
  if(busy||!R||R.nudges<1||R.phase==='battle')return;if(dir<0&&!has('gear'))return;
+ if(overCap()){toast(`Over the army allowance: absorb, merge or scrap ${used()-cap()} to nudge`,'#ff8a6b');return}
  R.nudges--;R.blast=false;begin();
  const old=[0,1,2].map(r=>R.grid[r*3+col]),ob=hasCore('orderbook');let inc=ob?peekOf(col):randSym(SL.rng);
  if(ob){R.peek[col]=randSym(SL.rng);coreFire('orderbook',`${UNITS[inc].n} came in, as shown`)}
@@ -1848,6 +1849,7 @@ function refill(old,s,freshQ){const g=old.slice(),fall=new Array(9).fill(0);let 
  return {g,fall}}
 async function blastSym(i){
  if(busy||!R||R.blasts<1)return;
+ if(overCap()){R.blast=false;toast(`Over the army allowance: absorb, merge or scrap ${used()-cap()} to blast`,'#ff8a6b');renderSlotCol();return}
  const s=R.grid[i];R.blasts--;R.blast=false;begin();$('#reels')?.classList.remove('blasting');setMq();
  const hit=R.grid.map((t,j)=>t===s?j:-1).filter(j=>j>=0);
  if(hasCore('recycler')){const e=Math.min(2*hit.length,Math.max(0,bankCap()-R.energy));R.energy+=e;tweenEnergy(R.energy);renderEbar();coreFire('recycler',`${hit.length} cells · +${e} energy`)}
@@ -1915,7 +1917,7 @@ async function celebrate(pay,src){
  if(chain>=2){stamp(`CHAIN ×${chain}`,{cls:'chain',sub:src==='nudge'?'nudge paid':src==='blast'?'blast paid':'',hold:HOLD[tier]+150});bus.emit('chain_'+Math.min(chain,6),{chain})}
  shake([0,.2,.32,.5,.9][tier]+Math.min(.25,(chain-1)*.08));
  if(tier===4){const w=rc($('.window'));for(let k=0;k<14;k++)setTimeout(()=>FX.tokens(rr(w.x-w.w/2,w.x+w.w/2),w.y-w.h/2-20,9,1.1),k*90)}
- say(`${label}. ${units}.${over?` Army over the allowance by ${over}: absorb, merge or scrap to spin again.`:''}`);
+ say(`${label}. ${units}.${over?` Army over the allowance by ${over}: absorb, merge or scrap to spin, nudge or blast again.`:''}`);
  addHeat(n);
  if(rally)coreFire('rally',`${n} lines · +10% HP and damage`);
  if(hasCore('whale')&&syms.some(t=>WHALE.includes(t)))coreFire('whale',[...new Set(syms.filter(t=>WHALE.includes(t)))].map(t=>UNITS[t].n).join(' + ')+' line');
@@ -1936,7 +1938,7 @@ function bumpArmy(cls){
 function summon(type,fromEl,mods={}){
  const u=UNITS[type],full=false;R.summonsTurn=(R.summonsTurn||0)+1;
  {const p=freeSpot(u.row);R.army.push({id:uid++,type,lvl:1,p:[],x:p.x,y:p.y,rally:mods.rally?1:0,gilded:mods.gild?1:0});Codex.unlock('summon',CX[type]||type)}
- if(overCap())setTimeout(()=>{stamp('OVERCAPACITY',{cls:'grey',sub:`Army ${used()}/${cap()} · all of them fight · absorb, merge or scrap to spin again`,hold:1300});bus.emit('army_over',{army:used(),cap:cap()})},200);
+ if(overCap())setTimeout(()=>{stamp('OVERCAPACITY',{cls:'grey',sub:`Army ${used()}/${cap()} · all of them fight · absorb, merge or scrap to spin, nudge or blast again`,hold:1300});bus.emit('army_over',{army:used(),cap:cap()})},200);
  const nArmy=army().length;
  if(!fromEl){toast(`+ ${u.n}`,u.c);return Promise.resolve()}
  const land=()=>{const tg=armyTarget();
@@ -2090,6 +2092,7 @@ const impHTML=u=>Object.entries(u.imp||{}).map(([k,l])=>`<b class="imp" title="$
 function absorbInto(s,u,choice,o={}){
  if(!R||R.phase==='battle'||(busy&&!o.quick)||!s||!u||s===u||!R.army.includes(s)||!R.army.includes(u))return false;
  if(s.lock){toast(`${uname(s)} is locked`,'#ff8a6b');R.sel=null;renderField();return false}
+ if(s.lvl>=2&&!o.okMerged&&!o.quick){R.sel=null;renderField();absorbWarn(s,u,choice);return false}
  if(!choice&&impPlan(s,u)==='full'){R.sel=null;renderField();absorbChoice(s,u);return false}
  const wasOver=overCap(),se=unitEl(s.id),ue=unitEl(u.id);
  const fin=()=>{const r=absorbState(s,u,choice||{convert:1});if(!o.quick)busy=false;
@@ -2107,22 +2110,33 @@ function absorbInto(s,u,choice,o={}){
   {transform:`translate(${b.left-a.left+(b.width-a.width)/2}px,${b.top-a.top+(b.height-a.height)/2}px) translate(${se.style.getPropertyValue('--tx')||'-50%'},${se.style.getPropertyValue('--ty')||'-82%'}) scale(.2)`,opacity:.15,filter:'brightness(2.6) saturate(0)'}],
   {duration:o.quick?190:340,easing:'cubic-bezier(.5,0,.75,.4)',fill:'forwards'}).finished.then(fin,fin);
  return true}
+// a merged donor (Lv2+) is 2 or 4 units' worth on the field. Absorbing one just to spin again is the trap the sim found
+// (expert depth-30 clear 20% -> 0%), so the game asks first and says what is lost and what is gained.
+function absorbWarn(s,u,choice){const st=stats(s),g=absorbGain(s),l0=abLv(u),l1=abLvOf((u.ax||0)+g),n=s.lvl===3?4:2;
+ modal(`<h2>Absorb a merged unit?</h2><p><b>${uname(s)}</b> is Lv${s.lvl}, ${n} ${UNITS[s.type].n}s' worth on the field (${st.maxHp} HP · ${st.atk} dmg). Absorbed, it gives ${uname(u)} +${g} absorb XP${l1>l0?` (Absorb LV ${l0} → ${l1})`:''} and its imprint.</p>
+  <p class="mute">Merged units are usually worth more on the field. If you only need room to spin, fight with the overflow or absorb Lv1 units instead.</p>
+  <div class="mrow"><button class="btn" id="close">Keep it</button><button class="btn red" id="absYes">Absorb anyway</button></div>`,
+  m=>{m.querySelector('#close').onclick=()=>{closeModal();renderField()};m.querySelector('#absYes').onclick=()=>{closeModal();absorbInto(s,u,choice,{okMerged:1})}})}
 // the receiver's imprint slots are full: replace one of its imprints, or convert the new one into Absorb LV
 function absorbChoice(s,u){const I=IMPRINT[s.type],L=s.lvl,g=absorbGain(s);
  modal(`<h2>Imprint slots full</h2><p>${uname(u)} holds ${impSlots(u)} imprints. ${uname(s)} brings <b>${I.n} ${ROMAN[L]}</b> (${I.d(L)}) and +${g} absorb XP.</p>
   <div class="opts">${Object.entries(u.imp).map(([k,l])=>`<button class="opt" data-rep="${k}"><span class="grow"><b>Replace ${IMPRINT[k].n} ${ROMAN[l]}</b><small>${IMPRINT[k].d(l)} → ${I.d(L)}. Its ${l} level${l>1?'s become':' becomes'} absorb XP (+${g+l} in all).</small></span></button>`).join('')}
   <button class="opt" data-conv="1"><span class="grow"><b>Convert ${I.n}</b><small>Keep the imprints. ${I.n} becomes absorb XP: +${g+L} in all.</small></span></button></div>
   <div class="mrow"><button class="btn" id="close">Cancel</button></div>`,
-  m=>{m.querySelectorAll('[data-rep]').forEach(b=>b.onclick=()=>{closeModal();absorbInto(s,u,{replace:b.dataset.rep})});
-   m.querySelector('[data-conv]').onclick=()=>{closeModal();absorbInto(s,u,{convert:1})};m.querySelector('#close').onclick=()=>{closeModal();renderField()}})}
+  m=>{m.querySelectorAll('[data-rep]').forEach(b=>b.onclick=()=>{closeModal();absorbInto(s,u,{replace:b.dataset.rep},{okMerged:1})});
+   m.querySelector('[data-conv]').onclick=()=>{closeModal();absorbInto(s,u,{convert:1},{okMerged:1})};m.querySelector('#close').onclick=()=>{closeModal();renderField()}})}
 // Hold to absorb (offered when the selected unit's imprint slots are full): while held, it takes in the unlocked units one by
-// one, commonest and lowest level first; a repeated imprint levels up, any other is converted. It pauses a beat when the
-// army gets back within the allowance, so letting go there keeps the rest. Any pointer up, key up or blur stops it.
-const holdDonors=u=>R.army.filter(x=>x!==u&&!x.lock).sort((a,b)=>RAR(a.type)-RAR(b.type)||a.lvl-b.lvl||(a.ax||0)-(b.ax||0));
-const HA={u:null,t:0,k:0};
-function holdStart(id){const u=R&&R.army.find(x=>x.id===id);if(!u||HA.u||R.phase==='battle'||busy)return;HA.u=u;HA.k=0;bus.emit('hold_absorb',{on:true});holdTick()}
+// one, Lv1 first and commonest first within a level; a repeated imprint levels up, any other is converted. It pauses a beat
+// when the army gets back within the allowance, so letting go there keeps the rest, and it stops before the first merged
+// unit (see absorbWarn): holding again within 8 s goes on through them. Any pointer up, key up or blur stops it.
+const holdDonors=u=>R.army.filter(x=>x!==u&&!x.lock).sort((a,b)=>a.lvl-b.lvl||RAR(a.type)-RAR(b.type)||(a.ax||0)-(b.ax||0));
+const HA={u:null,t:0,k:0,okMerged:false,warned:null};
+function holdStart(id){const u=R&&R.army.find(x=>x.id===id);if(!u||HA.u||R.phase==='battle'||busy)return;
+ const w=HA.warned;HA.okMerged=!!w&&w.id===id&&performance.now()-w.t<8000;HA.warned=null;HA.u=u;HA.k=0;bus.emit('hold_absorb',{on:true});holdTick()}
 function holdTick(){const u=HA.u;if(!u||!R||!R.army.includes(u)||R.phase==='battle')return holdEnd();
  const d=holdDonors(u)[0];if(!d)return holdEnd();
+ if(d.lvl>=2&&!HA.okMerged){holdEnd();HA.warned={id:u.id,t:performance.now()};buzz([12,40,12]);bus.emit('hold_merged',{unit:d.type,lvl:d.lvl});
+  toast(`Next up is a merged Lv${d.lvl} ${UNITS[d.type].n}: hold again to absorb merged units too`,'#ff8a6b');return}
  const was=overCap();absorbInto(d,u,{convert:1},{quick:1,k:HA.k++});
  HA.t=setTimeout(holdTick,was&&!overCap()?900:Math.max(150,420-35*HA.k))}
 function holdEnd(){if(!HA.u)return;clearTimeout(HA.t);HA.u=null;bus.emit('hold_absorb',{on:false});if(R&&R.phase!=='battle'&&!busy)renderField()}
@@ -2724,10 +2738,14 @@ function simMerge(){if(SIM.rookie&&!R.rkMerge)return;for(let again=1;again;){aga
 const simVal=u=>(UNITS[u.type].hp*UNITS[u.type].atk)*LV[u.lvl]*LV[u.lvl]*Math.pow(1+BAL.absorb.lv*abLv(u),2);
 // over the allowance with a spin to make: absorb the weakest unit into the one that gains most until the army fits (the novice
 // feeds its strongest). Overflow left at the end of the turn fights. The rookie only absorbs on turns it remembers to merge.
-// SIM.ap, when to cut overflow to keep spinning: 1 always (novice, rookie), 2 only if every unit to cut is Lv1 (expert: feeding
-// merged units just to spin is a trap, depth-30 clear 0% vs 20%), 3 never on the turn's first check (skip spinning instead)
+// SIM.ap, when to cut overflow to keep playing: 1 always (novice, rookie); 2 (expert) at the start of a turn always, since over
+// the allowance spins, nudges and blasts all lock, and within a turn only if every unit to cut is Lv1 (feeding merged units
+// just to spin again is a trap); 3 never on the turn's first check (skip the turn's actions instead)
 function simRoom(first){const ex=used()-cap();if(SIM.ap===3&&first===0)return false;
+ if(SIM.ap===2&&first===0)return true; // starting a turn over the allowance: cut back whatever it takes, or the whole turn is locked
  if(SIM.ap===2)return R.army.slice().sort((a,b)=>simVal(a)-simVal(b)).slice(0,ex).every(u=>u.lvl===1);return true}
+// nudges and blasts lock over the allowance too: make room the same way (by SIM.ap), or skip them
+const simFree=()=>{if(overCap()&&simRoom(1))simAbsorbDown();return !overCap()};
 function simAbsorbDown(){if(SIM.rookie&&!R.rkMerge)return;
  while(overCap()&&R.army.length>1){const d=R.army.reduce((a,b)=>simVal(b)<simVal(a)?b:a),g=absorbGain(d);
   const r=SIM.novice?R.army.filter(x=>x!==d).reduce((a,b)=>simVal(b)>simVal(a)?b:a)
@@ -2760,12 +2778,12 @@ function simManage(){
   if(overCap()&&R.spinsUsed<spinCap()&&R.energy>=spinCost()&&simRoom(guard))simAbsorbDown(); // make room only when a spin follows: overflow fights
   if(!canSpin())break;
   simSpin();simMerge();
-  const n=!SIM.rookie&&R.nudges>0&&simBestNudge();if(n&&(n.sure||!SIM.novice&&n.v>=.3)){simNudge(n.col,n.dir);simMerge()}
-  if(!SIM.novice&&R.blasts>0){const b=simBestBlast();if(b.v>=.6){simBlast(b.s);simMerge()}}
+  const n=!SIM.rookie&&R.nudges>0&&simBestNudge();if(n&&(n.sure||!SIM.novice&&n.v>=.3)&&simFree()){simNudge(n.col,n.dir);simMerge()}
+  if(!SIM.novice&&R.blasts>0){const b=simBestBlast();if(b.v>=.6&&simFree()){simBlast(b.s);simMerge()}}
  }
- if(SIM.novice){if(!SIM.rookie&&R.blasts>0&&Math.random()<.5){const c={};R.grid.forEach(t=>c[t]=(c[t]||0)+1);simBlast(Object.keys(c).sort((a,b)=>c[b]-c[a])[0]);simMerge()}}
- else{while(R.nudges>0){const n=simBestNudge();simNudge(n.col,n.dir);simMerge()}
- while(R.blasts>0){const b=simBestBlast();simBlast(b.s);simMerge()}}
+ if(SIM.novice){if(!SIM.rookie&&R.blasts>0&&Math.random()<.5&&simFree()){const c={};R.grid.forEach(t=>c[t]=(c[t]||0)+1);simBlast(Object.keys(c).sort((a,b)=>c[b]-c[a])[0]);simMerge()}}
+ else{while(R.nudges>0&&simFree()){const n=simBestNudge();simNudge(n.col,n.dir);simMerge()}
+ while(R.blasts>0&&simFree()){const b=simBestBlast();simBlast(b.s);simMerge()}}
  if(!R.army.length)simSummon('soldier'); // Machine Bailout
  simShop();simMerge();
 }
@@ -2949,11 +2967,11 @@ function checkBailout(){
 function renderControls(){
  renderTabs();renderEbar();
  const battle=R.phase==='battle',c=spinCost(),left=spinCap()-R.spinsUsed,ok=canSpin();
- const g=has('gear'),nOk=!battle&&!busy&&R.nudges>0;
+ const g=has('gear'),oc=!battle&&overCap(),nOk=!battle&&!busy&&R.nudges>0&&!oc; // over the allowance, nudges and blasts lock like paid spins
  // every nudge button shows what it will do: sure lines, the exact odds of the blind symbol completing one, or "blind"
  const nb=(col,dir)=>{const p=nudgePreview(col,dir),txt=p.known?(p.sure.length?`${p.sure.length} sure`:'no line'):p.sure.length&&p.chance?`${p.sure.length} sure · ${Math.round(p.chance*100)}%`:p.sure.length?`${p.sure.length} sure line${p.sure.length>1?'s':''}`:p.chance?`${Math.round(p.chance*100)}% to hit`:'blind';
   const hint=R.hintNudge&&nOk&&(p.sure.length||p.chance);
-  return `<button data-c="${col}" data-d="${dir}" ${nOk?'':'disabled'} class="${hint?'hint':''}" style="flex:1" aria-label="Nudge reel ${col+1} ${dir>0?'down':'up'}: ${txt}"><b>${dir>0?'▼':'▲'}${g?'':'<span class="nw"> NUDGE</span>'}${R.nudges>1&&dir>0?` <i>×${R.nudges}</i>`:''}</b><small class="${p.sure.length||p.chance?'hot':''}">${R.nudges<1?'none left':txt}</small></button>`};
+  return `<button data-c="${col}" data-d="${dir}" ${nOk?'':'disabled'} class="${hint?'hint':''}" style="flex:1" aria-label="Nudge reel ${col+1} ${dir>0?'down':'up'}: ${txt}"><b>${dir>0?'▼':'▲'}${g?'':'<span class="nw"> NUDGE</span>'}${R.nudges>1&&dir>0?` <i>×${R.nudges}</i>`:''}</b><small class="${!oc&&(p.sure.length||p.chance)?'hot':''}">${R.nudges<1?'none left':oc?'over cap':txt}</small></button>`};
  $('#nudges').innerHTML=[0,1,2].map(col=>`<div style="display:flex;gap:4px">${g?nb(col,-1):''}${nb(col,1)}</div>`).join('');
  R.hintNudge=0;
  $('#nudges').querySelectorAll('button').forEach(b=>{const col=+b.dataset.c,dir=+b.dataset.d;b.onclick=()=>nudge(col,dir);
@@ -2965,14 +2983,14 @@ function renderControls(){
  const sub=battle?'in battle':over?`absorb or scrap ${used()-cap()}`:left>0?(sure?`${ce} · sure win`:`${ce}${left>1?` · next ${nextCost}`:''}`):'no spins left';
  $('#ctrl').innerHTML=`<div class="controls"><button class="btn gold spinbtn${over?' over':''}" id="spin" ${ok||busy?'':'disabled'}>${title}<small>${sub}</small><span class="lamps">${Array.from({length:spinCap()},(_,k)=>`<i class="${k<left?'f':''}"></i>`).join('')}</span></button>
   <button class="btn nudgecount" disabled>Nudges<small>${R.nudges} left</small></button>
-  <button class="btn ${R.blast?'red on':''}" id="blast" ${!battle&&!busy&&R.blasts>0?'':'disabled'}>${R.blast?'Pick a symbol':'Blast'}<small>${R.blasts} left</small></button></div>`;
+  <button class="btn ${R.blast?'red on':''}" id="blast" ${!battle&&!busy&&R.blasts>0&&!oc?'':'disabled'}>${R.blast?'Pick a symbol':'Blast'}<small>${oc&&R.blasts>0?'over cap':R.blasts+' left'}</small></button></div>`;
  fillItems();
  document.querySelectorAll('[data-cores]').forEach(co=>{co.innerHTML=coresHTML();co.onclick=e=>{const c=e.target.closest('[data-core]');if(c){e.stopPropagation();coreTip(c);return}openParts()};co.onkeydown=e=>{if(e.key==='Enter')openParts()}});
  const ct=$('.coretray .plabel span:last-child');if(ct)ct.textContent=`${R.cores.length}/${coreOpen()} socketed · bag ${R.coreBag.length}/3`;
  renderRover();
  $('#spin').onclick=()=>{if(busy)return skipNow();autoPull('button')};
  checkBailout();
- $('#blast').onclick=()=>{if(busy)return;R.blast=!R.blast;if(R.blast)bus.emit('blast_arm');stopAttract();renderSlotCol()};
+ $('#blast').onclick=()=>{if(busy||overCap())return;R.blast=!R.blast;if(R.blast)bus.emit('blast_arm');stopAttract();renderSlotCol()};
  const lb=$('#leverbay');if(lb){lb.classList.toggle('locked',!ok&&!busy);setHint(ok||busy?'PULL':'LOCKED')}
 }
 // the icon rail (desktop: right edge; phone: bottom action bar). Keeps #tabs as its id.
@@ -3001,9 +3019,9 @@ function renderField(){
   units=R.army.map(u=>{const tgt=s&&u!==s&&u.type===s.type&&u.lvl===s.lvl&&u.lvl<3;return fu({id:u.id,k:u.type,aura:UNITS[u.type].aura,spr:'',lvl:u.lvl,ab:abLv(u),lock:u.lock,x:u.x,y:u.y,pct:100,cls:(u===s?'sel':tgt&&!R.absorb?'target':'')+(u.gilded?' gild':'')})}).join('');
   const absBtn=army().length>1||R.absorb?`<button class="btn speed absb ${R.absorb?'on':''}" id="absorbBtn" aria-pressed="${!!R.absorb}" title="Absorb mode: drag a unit onto any other to absorb it">${R.absorb?'Absorb: on':'Absorb'}</button>`:'';
   if(s&&R.absorb){const I=IMPRINT[s.type];info=`<div class="grow"><b>Absorb ${uname(s)}</b>${s.lock?`<div class="intel" style="color:#ff8a6b">Locked: unlock it to absorb it.</div>`:`<div class="mute">Tap the unit that takes it in. It gives +${absorbGain(s)} absorb XP and its imprint, <b class="imp">${I.n} ${ROMAN[s.lvl]}</b> (${I.d(s.lvl)})${s.gilded?`, plus ${BAL.absorb.gild} credits`:''}, and salvages ${BAL.absorb.salvage} credit.</div>`}</div><div class="ubtns">${absBtn}</div>`}
-  else if(s){const st=stats(s);info=`<div class="grow"><b>${uname(s)}</b> <span class="mute">Lv${s.lvl}</span><div class="mute">${s.gilded?'<b style="color:#f6d987;font-size:12px">GILDED +25%</b> · ':''}${s.rally?'<b style="color:#8fd0c8;font-size:12px">RALLY +10%</b> · ':''}${st.maxHp} HP · ${st.atk} dmg${st.heal?` · heals ${st.heal}`:''} · every ${(st.cd/1000).toFixed(1)}s · range ${UMOVE[s.type].rng>12?'long':'melee'}</div>${s.ax||impN(s)?`<div class="mute absl">Absorb LV ${abLv(s)} (${s.ax||0}/${abNext(abLv(s))} XP${abLv(s)?` · +${Math.round(BAL.absorb.lv*100*abLv(s))}% HP and damage`:''}) · imprints ${impN(s)}/${impSlots(s)}${impN(s)?': '+impHTML(s):''}</div>`:''}<div class="mute">${UNITS[s.type].tip}</div><div class="mute">Tap your side of the field to move it${s.lvl<3?`, or a glowing Lv${s.lvl} ${UNITS[s.type].n} to merge`:''}.</div></div><div class="ubtns"><button class="btn speed lockb ${s.lock?'on':''}" id="lockU" aria-pressed="${!!s.lock}" title="A locked unit is never absorbed or scrapped">${s.lock?LOCK:UNLOCK}<span>${s.lock?'Locked':'Lock'}</span></button><button class="btn speed" id="scrap" ${s.lock?'disabled':''}>Scrap +2c</button>${impN(s)>=impSlots(s)&&holdDonors(s).length?`<button class="btn speed holdb ${HA.u===s?'on':''}" id="holdAbs" data-hold="${s.id}" title="Hold: takes in unlocked units one by one (commonest first) as absorb XP">Hold to absorb<small>${holdDonors(s).length} unlocked</small></button>`:''}${absBtn}</div>`}
+  else if(s){const st=stats(s);info=`<div class="grow"><b>${uname(s)}</b> <span class="mute">Lv${s.lvl}</span><div class="mute">${s.gilded?'<b style="color:#f6d987;font-size:12px">GILDED +25%</b> · ':''}${s.rally?'<b style="color:#8fd0c8;font-size:12px">RALLY +10%</b> · ':''}${st.maxHp} HP · ${st.atk} dmg${st.heal?` · heals ${st.heal}`:''} · every ${(st.cd/1000).toFixed(1)}s · range ${UMOVE[s.type].rng>12?'long':'melee'}</div>${s.ax||impN(s)?`<div class="mute absl">Absorb LV ${abLv(s)} (${s.ax||0}/${abNext(abLv(s))} XP${abLv(s)?` · +${Math.round(BAL.absorb.lv*100*abLv(s))}% HP and damage`:''}) · imprints ${impN(s)}/${impSlots(s)}${impN(s)?': '+impHTML(s):''}</div>`:''}<div class="mute">${UNITS[s.type].tip}</div><div class="mute">Tap your side of the field to move it${s.lvl<3?`, or a glowing Lv${s.lvl} ${UNITS[s.type].n} to merge`:''}.</div></div><div class="ubtns"><button class="btn speed lockb ${s.lock?'on':''}" id="lockU" aria-pressed="${!!s.lock}" title="A locked unit is never absorbed or scrapped">${s.lock?LOCK:UNLOCK}<span>${s.lock?'Locked':'Lock'}</span></button><button class="btn speed" id="scrap" ${s.lock?'disabled':''}>Scrap +2c</button>${impN(s)>=impSlots(s)&&holdDonors(s).length?`<button class="btn speed holdb ${HA.u===s?'on':''}" id="holdAbs" data-hold="${s.id}" title="Hold: takes in unlocked units one by one (commonest first) as absorb XP">Hold to absorb<small>${holdDonors(s).filter(x=>x.lvl<2).length} unlocked${holdDonors(s).some(x=>x.lvl>1)?` · ${holdDonors(s).filter(x=>x.lvl>1).length} merged`:''}</small></button>`:''}${absBtn}</div>`}
   else{const intel=R.army.some(u=>u.type==='hacker')?Object.entries(R.enemies.reduce((m,e)=>(m[e.n]=(m[e.n]||0)+1,m),{})).map(([n,c])=>`${c} ${n}`).join(' · '):'';
-   info=`<div class="grow"><b>Army ${used()}/${cap()}</b>${overCap()?`<div class="intel" style="color:#ff8a6b">Over capacity by ${used()-cap()}: all of them fight, but paid spins are locked until you absorb, merge or scrap ${used()-cap()}.</div>`:''}${R.absorb?`<div class="intel absi">Absorb mode: drag a unit onto any other. It is gone for good and leaves absorb XP, its imprint and 1 credit. Locked units are safe.</div>`:''}${isBoss(R.wave)||isElite(R.wave)?`<div class="intel" style="color:#ff8a6b">${isBoss(R.wave)?'Boss':'Elite'} wave: losing it ends the run, hearts or not.</div>`:''}<div class="mute">${army().length?'Tap a unit, then tap the field to reposition it. Tap two matching units to merge.':'Spin the Summoner. Three in a row deploys a unit here.'}</div>${intel?`<div class="intel">Scout orb intel: ${intel}</div>`:''}</div>${absBtn?`<div class="ubtns">${absBtn}</div>`:''}`}}
+   info=`<div class="grow"><b>Army ${used()}/${cap()}</b>${overCap()?`<div class="intel" style="color:#ff8a6b">Over capacity by ${used()-cap()}: all of them fight, but paid spins, nudges and blasts are locked until you absorb, merge or scrap ${used()-cap()}.</div>`:''}${R.absorb?`<div class="intel absi">Absorb mode: drag a unit onto any other. It is gone for good and leaves absorb XP, its imprint and 1 credit. Locked units are safe.</div>`:''}${isBoss(R.wave)||isElite(R.wave)?`<div class="intel" style="color:#ff8a6b">${isBoss(R.wave)?'Boss':'Elite'} wave: losing it ends the run, hearts or not.</div>`:''}<div class="mute">${army().length?'Tap a unit, then tap the field to reposition it. Tap two matching units to merge.':'Spin the Summoner. Three in a row deploys a unit here.'}</div>${intel?`<div class="intel">Scout orb intel: ${intel}</div>`:''}</div>${absBtn?`<div class="ubtns">${absBtn}</div>`:''}`}}
  $('.fieldcol').innerHTML=`<div class="fwrap">
   <div class="fbox"><div class="field ${!battle&&R.sel!==null?'placing':''}${!battle&&R.absorb?' absorbmode':''}" id="field"><svg class="terrain" viewBox="0 0 100 60" preserveAspectRatio="xMidYMid slice">${TERRAIN}</svg><div class="paint"></div><svg class="gplane" id="gplane" preserveAspectRatio="none"></svg><div class="zone"><span class="zlabel">Your side</span></div><span class="elabel">${th.n} · Lv${R.level}</span><div class="fhead ribbon">${trackHTML(battle)}</div>${bossBar}${battle
       ?`<div class="ucount"><div><b id="ucP">${F.P.filter(f=>f.hp>0&&!f.orb).length}/${F.P.filter(f=>!f.orb).length}</b><small>YOURS</small></div><span class="sep"></span><div class="foe"><b id="ucE">${F.E.filter(f=>f.hp>0&&f.seen).length}</b><small>ENEMIES</small></div></div>`
