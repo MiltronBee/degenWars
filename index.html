@@ -1804,7 +1804,9 @@ const BAL={
                                                    // the wave-10 boss one-shot every Lv2 unit (121 dmg a hit on level 1) and a normal Lv2
                                                    // army beat it 5/10 on level 1, 0/10 on level 2 (owner: "impossible"). Now it hits for
                                                    // 64 and has 36% more HP: 7/10 and 6/10, and the fight is a slugging match, not a race.
- assist:{q:.9,pow:.4,min:.5,full:5,fade:10},       // hidden help for weak armies on level 1's first waves (v4, see assistK)
+ assist:{q:.9,pow:.4,min:.5,full:5,fade:6},        // hidden help for weak armies on level 1's waves 1-5 only (v4, see assistK). It used to
+                                                   // fade out over waves 6-9; owner: from wave 6 the player should feel the army's real strength
+                                                   // (the fade hid a weak army until the wave-10 boss)
  // absorption: Absorb LV a donor gives by its level (plus its own Absorb LV and imprint levels), +rare for a Commander or
  // Deployer, +rally for a Rally unit. Each Absorb LV gives +lv HP and damage, linearly: with spins, nudges and blasts locked
  // over the allowance, absorption is the army's late-game growth, and at +5% the probe (dwSim.probe) puts the army's strength
@@ -2902,7 +2904,7 @@ function battleSetup(){
 // ---- hidden assist (Difficulty v4, owner 2026-11-27: new players stuck on waves 3-4 "even with several troops") ----
 // Lanchester strength of a side = total HP × total damage per second (heals count half). q = army / wave.
 // On level 1's first waves an army below BAL.assist.q times the wave meets a softer wave: enemy HP and attack × (q/q*)^pow,
-// never below min; in full up to wave full, fading out by wave fade. A strong army (any expert) never triggers it. Not shown in the UI.
+// never below min; in full up to wave full, gone from wave fade (6: waves 1-5 only). A strong army (any expert) never triggers it. Not shown in the UI.
 const lanch=l=>l.reduce((s,f)=>s+f.maxHp,0)*l.reduce((s,f)=>s+(f.atk+(f.heal||0)*.5)/f.cd,0);
 function assistK(q){const A=BAL.assist;if(!A||SIM.probe||R.level>1||R.wave>=A.fade||q>=A.q)return 1;
  const t=R.wave<=A.full?1:1-(R.wave-A.full)/(A.fade-A.full);return 1-t*(1-Math.max(A.min,Math.pow(q/A.q,A.pow)))}
