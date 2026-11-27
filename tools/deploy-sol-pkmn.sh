@@ -18,7 +18,7 @@ cd "$(dirname "$0")/.."
 
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 # only what the page loads; audio/src (masters) stays home
-git archive HEAD index.html codex-v2.css codex.js ground.js art assets audio data | tar -x -C "$TMP"
+git archive HEAD index.html codex-v2.css codex.js ground.js gamepad.js art assets audio data | tar -x -C "$TMP"
 rm -rf "$TMP/audio/src"
 echo "==> $(git rev-parse --short HEAD): $(du -sh "$TMP" | cut -f1) -> $HOST:/var/www/degenwars/"
 
