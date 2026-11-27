@@ -41,7 +41,7 @@ https://sol-pkmn.fun/degenwars/ (public, noindex). To update it, build, commit, 
 | `index.html` | Built output: `python3 tools/style-v2/build.py` writes `index.html`, `style-v2.html` and `codex-v2.css` from `game.src.html`. |
 | `ground.js`, `data/ground.json` | The 2.5D ground plane, calibrated in `lab/ground.html`. |
 | `codex.js`, `codex.css` | The in-game Codex. |
-| `gamepad.js` | Controller support (see Controller above). Loaded after the game script and calls its functions. |
+| `gamepad.js` | Controller support (see Controller above). Loaded after the game script; the game's code lives in a block, so it hands this file `window.dwGame` (live state and the actions the pad drives). |
 | `assets/units/<id>/sheet-v2.*` | Baked unit sprite sheets. |
 | `art/` | Painted art: slot symbols, cores, UI and backgrounds. |
 | `lab/` | Test benches: roster, battle, slot feel, ground calibration, map. |

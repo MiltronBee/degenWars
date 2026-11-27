@@ -8,11 +8,15 @@
 //   X  spin (slam stop while the reels run)                    Y  blast (holding a unit: scrap it)
 //   LB battle   LT shop   RT battle speed   RB kit   Menu settings   View codex   right stick scrolls
 //
-// Loaded after the game script; it drives the game through the game's own globals (R, busy, view, autoPull,
-// startBattle, mergeUnits, place, renderField...) so every action takes the same path as a tap.
+// Loaded after the game script. The game's code lives in a block, so it hands this file window.dwGame: live R, view
+// and busy plus the actions it drives (autoPull, startBattle, mergeUnits, place, renderField...). Every action takes
+// the same path as a tap.
 (() => {
 'use strict';
 if (!navigator.getGamepads) return;
+const G = window.dwGame; if (!G) return; // the game's bridge (end of the game block in game.src.html)
+const { bus, SFX, FX, SHEETS, canSpin, army, canMerge, clampDeploy, unitEl, rc, buzz, play, place, renderField, mergeUnits, scrap,
+  startBattle, openSettings, autoPull, skipNow, stopAttract, armIdle, uname, leverGrab } = G;
 
 const BT = { A: 0, B: 1, X: 2, Y: 3, LB: 4, RB: 5, LT: 6, RT: 7, VIEW: 8, MENU: 9, UP: 12, DOWN: 13, LEFT: 14, RIGHT: 15 };
 const GRAB_SPEED = [38, 30]; // world units per second at full stick (the field is 100 x 60, your side 45 wide)
@@ -69,7 +73,7 @@ let mx = -1, my = -1;
 const ovl = () => { const o = document.getElementById('ovl'); return o && o.firstElementChild ? o : null; };
 const codexOpen = () => document.querySelector('#codex.show');
 const scope = () => codexOpen() || ovl() || document.getElementById('app') || document.body;
-const inGame = () => view === 'game' && !!R;
+const inGame = () => G.view === 'game' && !!G.R;
 const free = () => inGame() && !ovl() && !codexOpen(); // the game screen with nothing on top
 
 // ---------- what the highlight can land on ----------
@@ -83,8 +87,8 @@ const ok = el => !!el && !el.disabled && el.getAttribute('aria-disabled') !== 't
 function cands(root) {
   const set = new Set(root.querySelectorAll(SEL));
   if (root.id === 'app' && inGame()) {
-    if (R.blast) document.querySelectorAll('#reels .sym[data-i]').forEach(e => set.add(e));
-    if (R.phase !== 'battle') document.querySelectorAll('#field .fu[data-id]').forEach(e => set.add(e));
+    if (G.R.blast) document.querySelectorAll('#reels .sym[data-i]').forEach(e => set.add(e));
+    if (G.R.phase !== 'battle') document.querySelectorAll('#field .fu[data-id]').forEach(e => set.add(e));
   }
   set.delete(root);
   return [...set].filter(ok);
@@ -92,8 +96,8 @@ function cands(root) {
 // where the highlight may stay: a button that is disabled for a moment (a nudge mid-spin) keeps it, so it doesn't wander
 function holdable(el) {
   if (!el || !el.isConnected || !scope().contains(el)) return false;
-  if (el.matches('#reels .sym') && !(R && R.blast)) return false;
-  if (el.matches('#field .fu[data-id]') && !(R && R.phase !== 'battle')) return false;
+  if (el.matches('#reels .sym') && !(G.R && G.R.blast)) return false;
+  if (el.matches('#field .fu[data-id]') && !(G.R && G.R.phase !== 'battle')) return false;
   return vis(el);
 }
 // a stable name for an element, so the highlight finds it again after the game re-renders (id, else tag + data-*)
@@ -173,16 +177,16 @@ function slide(el, d) {
 
 // ---------- the field: grab, carry, drop (mirrors the touch drag in game.src.html bindDrag) ----------
 function grabUnit(id) {
-  if (!R || R.phase === 'battle' || busy) return;
-  const u = R.army.find(x => x.id === id); if (!u) return;
+  if (!G.R || G.R.phase === 'battle' || G.busy) return;
+  const u = G.R.army.find(x => x.id === id); if (!u) return;
   grab = { id, x: u.x, y: u.y, hot: null, held: true, moved: 0 };
-  R.sel = id; renderField(); // the info panel shows the unit (stats, Scrap) and matching units glow
+  G.R.sel = id; renderField(); // the info panel shows the unit (stats, Scrap) and matching units glow
   const el = unitEl(id), sh = el && el.querySelector('.sheet'); if (sh && SHEETS[u.type]?.clips.walk) play(sh, 'walk');
   bus.emit('unit_pick', { unit: u.type }); buzz(8);
 }
 function grabTick(dt, ix, iy) {
-  const u = R && R.army.find(x => x.id === grab.id);
-  if (!u || !free() || R.phase === 'battle' || busy || R.sel !== grab.id) return dropGrab(false);
+  const u = G.R && G.R.army.find(x => x.id === grab.id);
+  if (!u || !free() || G.R.phase === 'battle' || G.busy || G.R.sel !== grab.id) return dropGrab(false);
   ix = Math.max(-1, Math.min(1, ix)); iy = Math.max(-1, Math.min(1, iy));
   if (ix || iy) {
     const ox = grab.x, oy = grab.y;
@@ -190,7 +194,7 @@ function grabTick(dt, ix, iy) {
     if (grab.held) grab.moved += Math.hypot(grab.x - ox, grab.y - oy);
   }
   let hot = null, best = 4.5; // same reach as the touch drag
-  for (const v of R.army) { if (v === u) continue; const d = Math.hypot((v.x - grab.x) / 1.4, v.y - grab.y); if (d < best) { best = d; hot = v; } }
+  for (const v of G.R.army) { if (v === u) continue; const d = Math.hypot((v.x - grab.x) / 1.4, v.y - grab.y); if (d < best) { best = d; hot = v; } }
   if (hot !== grab.hot) { if (grab.hot) unitEl(grab.hot.id)?.classList.remove('mergehot', 'swaphot'); grab.hot = hot; if (hot) { buzz(5); rumble(.15, 30); } }
   if (hot) unitEl(hot.id)?.classList.add(canMerge(u, hot) ? 'mergehot' : 'swaphot');
   document.getElementById('field')?.classList.add('placing', 'dragging-on');
@@ -199,24 +203,24 @@ function grabTick(dt, ix, iy) {
 }
 // drop=true: land it here (merge / swap / move). drop=false: put it back where it was.
 function dropGrab(drop = true) {
-  const g = grab; grab = null; if (!g || !R) return;
+  const g = grab; grab = null; if (!g || !G.R) return;
   document.querySelectorAll('#field .fu.mergehot,#field .fu.swaphot').forEach(o => o.classList.remove('mergehot', 'swaphot'));
   document.getElementById('field')?.classList.remove('dragging-on');
-  const u = R.army.find(x => x.id === g.id);
-  if (!drop || !u || R.phase === 'battle' || busy) { if (R.sel === g.id) R.sel = null; if (u && R.phase !== 'battle' && !busy && document.getElementById('field')) renderField(); return; }
-  const hot = g.hot && R.army.includes(g.hot) ? g.hot : null, el = unitEl(u.id);
+  const u = G.R.army.find(x => x.id === g.id);
+  if (!drop || !u || G.R.phase === 'battle' || G.busy) { if (G.R.sel === g.id) G.R.sel = null; if (u && G.R.phase !== 'battle' && !G.busy && document.getElementById('field')) renderField(); return; }
+  const hot = g.hot && G.R.army.includes(g.hot) ? g.hot : null, el = unitEl(u.id);
   el?.classList.remove('dragging');
   if (hot && canMerge(u, hot)) { bus.emit('unit_drop', { unit: u.type, merge: true }); curKey = `div[data-id="${hot.id}"]`; return mergeUnits(u, hot); }
-  R.sel = null;
+  G.R.sel = null;
   if (hot) { // swap: the carried unit takes the other's spot, the other walks to where the carried one started
     const hx = hot.x, hy = hot.y; hot.x = u.x; hot.y = u.y; u.x = hx; u.y = hy;
     if (el) place(el, hx, hy, u.type);
     const oe = unitEl(hot.id); if (oe) { oe.classList.add('glide'); oe.style.transitionDuration = '320ms'; place(oe, hot.x, hot.y, hot.type); }
-    bus.emit('unit_drop', { unit: u.type }); setTimeout(() => R && R.phase !== 'battle' && renderField(), 340); return;
+    bus.emit('unit_drop', { unit: u.type }); setTimeout(() => G.R && G.R.phase !== 'battle' && renderField(), 340); return;
   }
   u.x = g.x; u.y = g.y;
   if (el) { const c = rc(el); FX.dust(c.x, c.y + c.h * .35, 3); el.classList.add('landed'); }
-  buzz(10); bus.emit('unit_drop', { unit: u.type }); setTimeout(() => R && R.phase !== 'battle' && renderField(), 220);
+  buzz(10); bus.emit('unit_drop', { unit: u.type }); setTimeout(() => G.R && G.R.phase !== 'battle' && renderField(), 220);
 }
 
 // ---------- buttons ----------
@@ -238,32 +242,32 @@ function back() {
   const tips = document.querySelectorAll('.ctip'); if (tips.length) return tips.forEach(t => t.remove());
   if (codexOpen()) { const b = [...document.querySelectorAll('#codex [data-back]')].find(ok); return b ? b.click() : Codex.close(); }
   const o = ovl(); if (o) { const c = ['#bmDone', '#close', '#setOk'].map(s => o.querySelector(s)).find(ok); if (c) c.click(); return; } // a choice (class, cache, run end) has no back
-  if (!inGame() || busy) return;
-  if (R.blast) { document.getElementById('blast')?.click(); return focusEl(document.getElementById('blast')); }
-  if (R.sel != null && R.phase !== 'battle') { R.sel = null; renderField(); }
+  if (!inGame() || G.busy) return;
+  if (G.R.blast) { document.getElementById('blast')?.click(); return focusEl(document.getElementById('blast')); }
+  if (G.R.sel != null && G.R.phase !== 'battle') { G.R.sel = null; renderField(); }
 }
 function spinPad() { // the same as Space: pull the lever, or slam-stop a spin that is running
   if (!free()) return;
   if (grab) dropGrab(false);
   const lb = document.getElementById('leverbay');
   if (!lb || !lb.offsetParent) { const m = document.getElementById('mode'); if (m && !m.disabled && m.dataset.m === 'slot') m.click(); return; } // phone layout on the Field tab
-  if (busy) return skipNow();
-  if (!canSpin()) return window.grab({ pointerId: -1, clientY: 0, timeStamp: performance.now(), currentTarget: lb, preventDefault() {} }, 'lever'); // the game's own "can't spin" feedback
+  if (G.busy) return skipNow();
+  if (!canSpin()) return leverGrab({ pointerId: -1, clientY: 0, timeStamp: performance.now(), currentTarget: lb, preventDefault() {} }, 'lever'); // the game's own "can't spin" feedback
   autoPull('pad');
 }
 function blastPad() {
   if (!free()) return;
-  if (grab) { const id = grab.id; grab = null; if (R.sel === id && R.phase !== 'battle' && !busy) { rumble(.5, 120); scrap(); } return; }
+  if (grab) { const id = grab.id; grab = null; if (G.R.sel === id && G.R.phase !== 'battle' && !G.busy) { rumble(.5, 120); scrap(); } return; }
   const b = document.getElementById('blast'); if (!b || b.disabled) return;
   b.click();
-  if (R.blast) focusEl(document.querySelector('#reels .sym[data-i="4"]') || document.getElementById('blast'));
+  if (G.R.blast) focusEl(document.querySelector('#reels .sym[data-i="4"]') || document.getElementById('blast'));
   else focusEl(document.getElementById('blast'));
 }
 function battlePad() {
   if (!free()) return;
   if (grab) dropGrab(false);
   const b = document.getElementById('fight2');
-  if (b && !b.disabled) b.click(); else if (R.phase !== 'battle' && !busy && !army().length) startBattle(); // says "no units"
+  if (b && !b.disabled) b.click(); else if (G.R.phase !== 'battle' && !G.busy && !army().length) startBattle(); // says "no units"
 }
 function shopPad() {
   if (codexOpen()) return;
@@ -365,8 +369,8 @@ function step(s, t, dt) {
 }
 function paint(t) {
   const root = scope();
-  if (view !== lastView || R !== lastRun) { // base <-> run, or a new run: start on the main button
-    lastView = view; lastRun = R; memo.clear();
+  if (G.view !== lastView || G.R !== lastRun) { // base <-> run, or a new run: start on the main button
+    lastView = G.view; lastRun = G.R; memo.clear();
     if (root.id === 'app') { lastRoot = root; focusEl(pickDefault(cands(root)), true); }
   }
   if (root !== lastRoot) { // a dialog opened or closed: remember where we were, come back to it later
@@ -384,7 +388,7 @@ function paint(t) {
 
   let txt = '';
   if (showRing && t - focusT > 380) {
-    if (cur.matches('#field .fu[data-id]') && R) { const u = R.army.find(x => x.id === +cur.dataset.id); if (u) txt = `${uname(u)} · Lv${u.lvl}`; }
+    if (cur.matches('#field .fu[data-id]') && G.R) { const u = G.R.army.find(x => x.id === +cur.dataset.id); if (u) { let n = ''; try { n = uname(u); } catch (e) {} txt = n ? `${n} · Lv${u.lvl}` : `Lv${u.lvl} · pick its class`; } }
     else txt = cur.getAttribute('title') || '';
   }
   if (txt) {
@@ -404,10 +408,10 @@ function paint(t) {
   }
 
   let L = '';
-  if (grab && R) {
-    const u = R.army.find(x => x.id === grab.id), act = grab.hot ? (canMerge(u, grab.hot) ? 'Merge' : 'Swap') : 'Drop';
+  if (grab && G.R) {
+    const u = G.R.army.find(x => x.id === grab.id), act = grab.hot ? (canMerge(u, grab.hot) ? 'Merge' : 'Swap') : 'Drop';
     L = `<span>${glyph('L')}Move</span><span>${glyph('A')}${act}</span><span>${glyph('B')}Put back</span><span>${glyph('Y')}Scrap</span>`;
-  } else if (root.id === 'app' && inGame() && R.blast) L = `<span>${glyph('A')}Blast this symbol</span><span>${glyph('B')}Cancel</span>`;
+  } else if (root.id === 'app' && inGame() && G.R.blast) L = `<span>${glyph('A')}Blast this symbol</span><span>${glyph('B')}Cancel</span>`;
   else if (root.id === 'app' && cur && cur.matches('#field .fu[data-id]')) L = `<span>${glyph('A')}Grab</span><span>${glyph('L')}Carry it onto a match to merge</span>`;
   if (L !== legendHTML) { legendHTML = L; legend.innerHTML = L; }
   legend.classList.toggle('on', !!L);

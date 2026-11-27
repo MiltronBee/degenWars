@@ -2873,6 +2873,9 @@ Promise.all([sheetsReady,Ground.ready]).then(()=>{render();
  newRun(1,+(new URLSearchParams(location.search).get('depth')||10));R.wave=+(new URLSearchParams(location.search).get('wave')||1);makeWave();R.army=[];R.capBonus=2;const at={lancer:[39,30],soldier:[36,16],outrider:[40,47],commander:[29,40],hacker:[31,27],sniper:[12,24],drone:[19,48]};
  for(const t of TYPES)R.army.push({id:uid++,type:t,lvl:t==='hacker'?3:1,p:t==='hacker'?[0,0]:[],x:at[t][0],y:at[t][1]});
  mtab='field';render();if(demo==='battle')setTimeout(startBattle,600)});
+// gamepad.js runs outside this block, so it can't see R, view or busy: hand it live getters and the actions it drives
+window.dwGame={get R(){return R},get view(){return view},get busy(){return busy},
+ bus,SFX,FX,SHEETS,canSpin,army,canMerge,clampDeploy,unitEl,rc,buzz,play,place,renderField,mergeUnits,scrap,startBattle,openSettings,autoPull,skipNow,stopAttract,armIdle,uname,leverGrab:grab};
 }
 </script>
 <script src="gamepad.js"></script><!-- controller support: highlight nav, A grabs units, X spin, LB battle, LT shop, RT speed -->
